@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>String Encoder/Decoder</title>
+    <!-- Bulma CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Alpine.js -->
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>
+        .textarea {
+            min-height: 120px;
+        }
+        .result-textarea {
+            background-color: #f5f5f5;
+            min-height: 120px;
+        }
+        .error-text {
+            color: #ff3860;
+            font-size: 0.85rem;
+            margin-top: 0.25rem;
+        }
+    </style>
+</head>
+<body>
+    <div x-data="encoderApp()" class="container mt-5">
+        <div class="columns is-centered">
+            <div class="column is-10">
+                <!-- Header -->
+                <div class="has-text-centered mb-5">
+                    <h1 class="title is-2">
+                        <i class="fas fa-code mr-2"></i>
+                        String Encoder/Decoder
+                    </h1>
+                    <p class="subtitle is-5">Encode and decode strings using various formats</p>
+                </div>
+
+                <!-- Main Card -->
+                <div class="card">
+                    <div class="card-content">
+                        <!-- Encoding Type Selection -->
+                        <div class="field">
+                            <label class="label">Encoding Type</label>
+                            <div class="control">
+                                <div class="select is-fullwidth">
+                                    <select x-model="encodingType" @change="clearResults()">
+                                        <option value="base64">Base64</option>
+                                        <option value="uri">URI Component</option>
+                                        <option value="binhex">Binary to Hex</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Input Text Area -->
+                        <div class="field">
+                            <label class="label">Input Text</label>
+                            <div class="control">
+                                <textarea 
+                                    x-model="inputText" 
+                                    @input="clearResults()"
+                                    class="textarea" 
+                                    placeholder="Enter text to encode/decode..."
+                                    rows="5">
+                                </textarea>
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="field is-grouped is-grouped-centered">
+                            <div class="control">
+                                <button 
+                                    @click="encode()" 
+                                    class="button is-primary"
+                                    :disabled="!inputText.trim()">
+                                    <span class="icon">
+                                        <i class="fas fa-lock"></i>
+                                    </span>
+                                    <span>Encode</span>
+                                </button>
+                            </div>
+                            <div class="control">
+                                <button 
+                                    @click="decode()" 
+                                    class="button is-info"
+                                    :disabled="!inputText.trim()">
+                                    <span class="icon">
+                                        <i class="fas fa-unlock"></i>
+                                    </span>
+                                    <span>Decode</span>
+                                </button>
+                            </div>
+                            <div class="control">
+                                <button 
+                                    @click="clearAll()" 
+                                    class="button is-light">
+                                    <span class="icon">
+                                        <i class="fas fa-eraser"></i>
+                                    </span>
+                                    <span>Clear</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Error Message -->
+                        <div x-show="errorMessage" class="notification is-danger mt-4">
+                            <button class="delete" @click="errorMessage = ''"></button>
+                            <strong>Error:</strong> <span x-text="errorMessage"></span>
+                        </div>
+
+                        <!-- Results Section -->
+                        <div x-show="showResults" class="mt-5">
+                            <div class="columns">
+                                <!-- Encoded Result -->
+                                <div class="column">
+                                    <div class="field">
+                                        <label class="label">
+                                            Encoded Result
+                                            <span class="tag is-small is-primary ml-2" x-text="encodingType.toUpperCase()"></span>
+                                        </label>
+                                        <div class="control">
+                                            <textarea 
+                                                x-model="encodedResult" 
+                                                class="textarea result-textarea" 
+                                                readonly
+                                                rows="5">
+                                            </textarea>
+                                        </div>
+                                        <div class="field is-grouped mt-2">
+                                            <div class="control">
+                                                <button 
+                                                    @click="copyToClipboard(encodedResult)" 
+                                                    class="button is-small is-outlined"
+                                                    :disabled="!encodedResult">
+                                                    <span class="icon is-small">
+                                                        <i class="fas fa-copy"></i>
+                                                    </span>
+                                                    <span>Copy</span>
+                                                </button>
+                                            </div>
+                                            <div class="control">
+                                                <button 
+                                                    @click="useAsInput(encodedResult)" 
+                                                    class="button is-small is-outlined"
+                                                    :disabled="!encodedResult">
+                                                    <span class="icon is-small">
+                                                        <i class="fas fa-arrow-up"></i>
+                                                    </span>
+                                                    <span>Use as Input</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Decoded Result -->
+                                <div class="column">
+                                    <div class="field">
+                                        <label class="label">
+                                            Decoded Result
+                                            <span class="tag is-small is-info ml-2">Plain Text</span>
+                                        </label>
+                                        <div class="control">
+                                            <textarea 
+                                                x-model="decodedResult" 
+                                                class="textarea result-textarea" 
+                                                readonly
+                                                rows="5">
+                                            </textarea>
+                                        </div>
+                                        <div class="field is-grouped mt-2">
+                                            <div class="control">
+                                                <button 
+                                                    @click="copyToClipboard(decodedResult)" 
+                                                    class="button is-small is-outlined"
+                                                    :disabled="!decodedResult">
+                                                    <span class="icon is-small">
+                                                        <i class="fas fa-copy"></i>
+                                                    </span>
+                                                    <span>Copy</span>
+                                                </button>
+                                            </div>
+                                            <div class="control">
+                                                <button 
+                                                    @click="useAsInput(decodedResult)" 
+                                                    class="button is-small is-outlined"
+                                                    :disabled="!decodedResult">
+                                                    <span class="icon is-small">
+                                                        <i class="fas fa-arrow-up"></i>
+                                                    </span>
+                                                    <span>Use as Input</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Information Section -->
+                        <div class="notification is-light mt-5">
+                            <h4 class="title is-6">Encoding Information:</h4>
+                            <div x-show="encodingType === 'base64'">
+                                <p><strong>Base64:</strong> A binary-to-text encoding scheme that represents binary data in an ASCII string format. Commonly used for encoding data in emails and web applications.</p>
+                            </div>
+                            <div x-show="encodingType === 'uri'">
+                                <p><strong>URI Component:</strong> Percent-encoding used in URLs to encode special characters. Converts characters to %XX format where XX is the hexadecimal value.</p>
+                            </div>
+                            <div x-show="encodingType === 'binhex'">
+                                <p><strong>Binary to Hex:</strong> Converts each character to its hexadecimal representation. Each byte is represented as two hexadecimal digits.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function encoderApp() {
+            return {
+                encodingType: 'base64',
+                inputText: '',
+                encodedResult: '',
+                decodedResult: '',
+                errorMessage: '',
+                showResults: false,
+
+                encode() {
+                    this.errorMessage = '';
+                    this.showResults = true;
+
+                    try {
+                        switch (this.encodingType) {
+                            case 'base64':
+                                this.encodedResult = btoa(unescape(encodeURIComponent(this.inputText)));
+                                break;
+                            case 'uri':
+                                this.encodedResult = encodeURIComponent(this.inputText);
+                                break;
+                            case 'binhex':
+                                this.encodedResult = this.stringToHex(this.inputText);
+                                break;
+                        }
+                    } catch (error) {
+                        this.errorMessage = `Encoding failed: ${error.message}`;
+                        this.encodedResult = '';
+                    }
+                },
+
+                decode() {
+                    this.errorMessage = '';
+                    this.showResults = true;
+
+                    try {
+                        switch (this.encodingType) {
+                            case 'base64':
+                                this.decodedResult = decodeURIComponent(escape(atob(this.inputText)));
+                                break;
+                            case 'uri':
+                                this.decodedResult = decodeURIComponent(this.inputText);
+                                break;
+                            case 'binhex':
+                                this.decodedResult = this.hexToString(this.inputText);
+                                break;
+                        }
+                    } catch (error) {
+                        this.errorMessage = `Decoding failed: ${error.message}`;
+                        this.decodedResult = '';
+                    }
+                },
+
+                stringToHex(str) {
+                    let hex = '';
+                    for (let i = 0; i < str.length; i++) {
+                        const hexChar = str.charCodeAt(i).toString(16).padStart(2, '0');
+                        hex += hexChar;
+                    }
+                    return hex.toUpperCase();
+                },
+
+                hexToString(hex) {
+                    // Remove any spaces or non-hex characters
+                    hex = hex.replace(/[^0-9A-Fa-f]/g, '');
+                    
+                    if (hex.length % 2 !== 0) {
+                        throw new Error('Invalid hex string length');
+                    }
+
+                    let str = '';
+                    for (let i = 0; i < hex.length; i += 2) {
+                        const hexPair = hex.substr(i, 2);
+                        const charCode = parseInt(hexPair, 16);
+                        if (isNaN(charCode)) {
+                            throw new Error('Invalid hex character');
+                        }
+                        str += String.fromCharCode(charCode);
+                    }
+                    return str;
+                },
+
+                copyToClipboard(text) {
+                    if (!text) return;
+                    
+                    navigator.clipboard.writeText(text).then(() => {
+                        // Show a temporary success message
+                        this.showCopySuccess();
+                    }).catch(err => {
+                        // Fallback for older browsers
+                        const textarea = document.createElement('textarea');
+                        textarea.value = text;
+                        document.body.appendChild(textarea);
+                        textarea.select();
+                        document.execCommand('copy');
+                        document.body.removeChild(textarea);
+                        this.showCopySuccess();
+                    });
+                },
+
+                showCopySuccess() {
+                    // You could implement a toast notification here
+                    // For now, we'll just briefly show it in the error message area
+                    const originalError = this.errorMessage;
+                    this.errorMessage = '';
+                    setTimeout(() => {
+                        this.errorMessage = originalError;
+                    }, 1500);
+                },
+
+                useAsInput(text) {
+                    if (!text) return;
+                    this.inputText = text;
+                    this.clearResults();
+                },
+
+                clearResults() {
+                    this.encodedResult = '';
+                    this.decodedResult = '';
+                    this.errorMessage = '';
+                    this.showResults = false;
+                },
+
+                clearAll() {
+                    this.inputText = '';
+                    this.clearResults();
+                }
+            }
+        }
+    </script>
+</body>
+</html>

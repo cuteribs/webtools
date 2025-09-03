@@ -1,256 +1,533 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JWT 解码 & 签名验证工具 (自动发现)</title>
-    
-    <!-- 1. Bulma CSS 框架 -->
+    <title>JWT Decoder & Signature Verifier</title>
+    <!-- Bulma CSS -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
-    
-    <!-- 2. Alpine.js 轻量 JS 框架 -->
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-
-    <!-- 3. Jose 库用于 JWT 签名验证 -->
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Alpine.js -->
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <!-- Jose library for JWT verification -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jose/4.14.4/index.umd.min.js"></script>
-
     <style>
-        /* 自定义样式，让工具更好用 */
-        .container {
-            max-width: 1200px;
-            margin-top: 2rem;
-            margin-bottom: 2rem;
-        }
-        .jwt-textarea {
+        .textarea {
+            min-height: 120px;
             font-family: 'Courier New', Courier, monospace;
             font-size: 0.9em;
-            min-height: 300px;
+        }
+        .jwt-input {
+            min-height: 200px;
             word-break: break-all;
         }
-        pre {
-            white-space: pre-wrap; /* 自动换行 */
-            word-wrap: break-word; /* 单词内换行 */
+        .result-textarea {
+            background-color: #f5f5f5;
+            min-height: 120px;
+        }
+        .json-output {
+            background-color: #f5f5f5;
+            padding: 1rem;
+            border-radius: 4px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.9em;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            min-height: 150px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .header-output {
+            border-left: 4px solid #3273dc;
+        }
+        .payload-output {
+            border-left: 4px solid #48c774;
+        }
+        .signature-section {
+            border-top: 1px solid #dbdbdb;
+            padding-top: 2rem;
+            margin-top: 2rem;
         }
     </style>
 </head>
 <body>
 
-<section class="section">
-    <div class="container" x-data="jwtTools()">
-        <h1 class="title has-text-centered">JWT 解码 & 签名验证</h1>
-        <p class="subtitle has-text-centered">支持从 Issuer 自动发现 JWKS URL</p>
+    <div x-data="jwtApp()" class="container mt-5">
+        <div class="columns is-centered">
+            <div class="column is-11">
+                <!-- Header -->
+                <div class="has-text-centered mb-5">
+                    <h1 class="title is-2">
+                        <i class="fas fa-key mr-2"></i>
+                        JWT Decoder & Signature Verifier
+                    </h1>
+                    <p class="subtitle is-5">Decode JWT tokens and verify signatures with auto-discovery</p>
+                </div>
 
-        <div class="columns">
-            <!-- 左侧：JWT 输入 -->
-            <div class="column">
-                <div class="field">
-                    <label class="label">Encoded JWT</label>
-                    <div class="control">
-                        <textarea
-                            class="textarea jwt-textarea"
-                            placeholder="在此粘贴你的 JSON Web Token..."
-                            rows="35"
-                            x-model="jwtInput"
-                            @input.debounce.250ms="decodeJwt"
-                        ></textarea>
+                <!-- Main Card -->
+                <div class="card">
+                    <div class="card-content">
+                        <!-- JWT Input Section -->
+                        <div class="field">
+                            <label class="label">
+                                <i class="fas fa-code mr-1"></i>
+                                JWT Token Input
+                            </label>
+                            <div class="control">
+                                <textarea 
+                                    x-model="jwtInput" 
+                                    @input.debounce.250ms="decodeJwt()"
+                                    class="textarea jwt-input" 
+                                    placeholder="Paste your JSON Web Token here..."
+                                    rows="8">
+                                </textarea>
+                            </div>
+                            <p class="help">Paste a complete JWT token (header.payload.signature)</p>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="field is-grouped is-grouped-centered mb-5">
+                            <div class="control">
+                                <button 
+                                    @click="decodeJwt()" 
+                                    class="button is-primary"
+                                    :disabled="!jwtInput.trim()">
+                                    <span class="icon">
+                                        <i class="fas fa-unlock"></i>
+                                    </span>
+                                    <span>Decode JWT</span>
+                                </button>
+                            </div>
+                            <div class="control">
+                                <button 
+                                    @click="clearAll()" 
+                                    class="button is-light">
+                                    <span class="icon">
+                                        <i class="fas fa-eraser"></i>
+                                    </span>
+                                    <span>Clear</span>
+                                </button>
+                            </div>
+                            <div class="control">
+                                <button 
+                                    @click="copyToken()" 
+                                    class="button is-outlined"
+                                    :disabled="!jwtInput.trim()">
+                                    <span class="icon">
+                                        <i class="fas fa-copy"></i>
+                                    </span>
+                                    <span>Copy Token</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Error Message -->
+                        <div x-show="decodeError" class="notification is-danger mb-5">
+                            <button class="delete" @click="decodeError = ''"></button>
+                            <strong>Decode Error:</strong> <span x-text="decodeError"></span>
+                        </div>
+
+                        <!-- Decoded Results -->
+                        <div x-show="showResults" class="mb-5">
+                            <div class="columns">
+                                <!-- Left Side: Decoded JSON -->
+                                <div class="column is-8">
+                                    <!-- Header -->
+                                    <div class="field mb-4">
+                                        <label class="label">
+                                            <i class="fas fa-file-code mr-1"></i>
+                                            Header
+                                            <span class="tag is-small is-info ml-2">Algorithm & Type</span>
+                                        </label>
+                                        <div class="json-output header-output" x-text="decodedHeader ? prettyPrint(decodedHeader) : 'No header decoded'"></div>
+                                        <div class="field is-grouped mt-2">
+                                            <div class="control">
+                                                <button 
+                                                    @click="copyToClipboard(prettyPrint(decodedHeader))" 
+                                                    class="button is-small is-outlined"
+                                                    :disabled="!decodedHeader">
+                                                    <span class="icon is-small">
+                                                        <i class="fas fa-copy"></i>
+                                                    </span>
+                                                    <span>Copy</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Payload -->
+                                    <div class="field">
+                                        <label class="label">
+                                            <i class="fas fa-database mr-1"></i>
+                                            Payload
+                                            <span class="tag is-small is-success ml-2">Claims & Data</span>
+                                        </label>
+                                        <div class="json-output payload-output" x-text="decodedPayload ? prettyPrint(decodedPayload) : 'No payload decoded'"></div>
+                                        <div class="field is-grouped mt-2">
+                                            <div class="control">
+                                                <button 
+                                                    @click="copyToClipboard(prettyPrint(decodedPayload))" 
+                                                    class="button is-small is-outlined"
+                                                    :disabled="!decodedPayload">
+                                                    <span class="icon is-small">
+                                                        <i class="fas fa-copy"></i>
+                                                    </span>
+                                                    <span>Copy</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Right Side: Token Information -->
+                                <div class="column is-4">
+                                    <div x-show="decodedPayload" class="notification is-light">
+                                        <h4 class="title is-6">
+                                            <i class="fas fa-info-circle mr-1"></i>
+                                            Token Information
+                                        </h4>
+                                        <div class="content">
+                                            <p><strong>Algorithm:</strong> <span x-text="decodedHeader?.alg || 'Unknown'"></span></p>
+                                            <p><strong>Type:</strong> <span x-text="decodedHeader?.typ || 'Unknown'"></span></p>
+                                            <p x-show="decodedHeader?.kid"><strong>Key ID:</strong> <span x-text="decodedHeader?.kid"></span></p>
+                                            
+                                            <hr class="my-3">
+                                            
+                                            <p x-show="decodedPayload?.iss"><strong>Issuer:</strong> <span x-text="decodedPayload?.iss" style="word-break: break-all;"></span></p>
+                                            <p x-show="decodedPayload?.sub"><strong>Subject:</strong> <span x-text="decodedPayload?.sub"></span></p>
+                                            <p x-show="decodedPayload?.aud"><strong>Audience:</strong> <span x-text="Array.isArray(decodedPayload?.aud) ? decodedPayload?.aud.join(', ') : decodedPayload?.aud" style="word-break: break-all;"></span></p>
+                                            
+                                            <hr class="my-3" x-show="decodedPayload?.exp || decodedPayload?.iat || decodedPayload?.nbf">
+                                            
+                                            <p x-show="decodedPayload?.exp"><strong>Expires:</strong><br><span x-text="formatTimestamp(decodedPayload?.exp)" class="is-size-7"></span></p>
+                                            <p x-show="decodedPayload?.iat"><strong>Issued At:</strong><br><span x-text="formatTimestamp(decodedPayload?.iat)" class="is-size-7"></span></p>
+                                            <p x-show="decodedPayload?.nbf"><strong>Not Before:</strong><br><span x-text="formatTimestamp(decodedPayload?.nbf)" class="is-size-7"></span></p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Signature Verification Section -->
+                        <div class="signature-section">
+                            <h3 class="title is-4 mb-4">
+                                <i class="fas fa-shield-alt mr-2"></i>
+                                Signature Verification
+                            </h3>
+                            
+                            <div class="field">
+                                <label class="label">
+                                    <i class="fas fa-link mr-1"></i>
+                                    JWKS URL
+                                    <span x-show="isFetchingJwksUrl" class="tag is-warning is-small ml-2">
+                                        <i class="fas fa-spinner fa-spin mr-1"></i>Auto-discovering...
+                                    </span>
+                                    <span x-show="jwksUrl && decodedPayload?.iss && !isFetchingJwksUrl" class="tag is-success is-small ml-2">
+                                        <i class="fas fa-check mr-1"></i>Auto-discovered
+                                    </span>
+                                </label>
+                                <div class="control" :class="{ 'is-loading': isFetchingJwksUrl }">
+                                    <input
+                                        x-model="jwksUrl"
+                                        class="input"
+                                        type="url"
+                                        placeholder="e.g., https://www.googleapis.com/oauth2/v3/certs"
+                                        :disabled="isFetchingJwksUrl">
+                                </div>
+                                <p class="help">
+                                    <i class="fas fa-info-circle mr-1"></i>
+                                    <span x-show="!decodedPayload?.iss">JWKS URL will be auto-discovered from the token's issuer if available</span>
+                                    <span x-show="decodedPayload?.iss && !isFetchingJwksUrl && jwksUrl">
+                                        Auto-discovered from: <code x-text="decodedPayload?.iss + '/.well-known/openid-configuration'"></code>
+                                    </span>
+                                    <span x-show="decodedPayload?.iss && !isFetchingJwksUrl && !jwksUrl" class="has-text-warning">
+                                        Auto-discovery failed for issuer: <code x-text="decodedPayload?.iss"></code>
+                                    </span>
+                                </p>
+                            </div>
+
+                            <div class="field">
+                                <div class="control">
+                                    <button
+                                        @click="verifySignature()"
+                                        class="button is-success is-fullwidth"
+                                        :disabled="!jwtInput.trim() || !jwksUrl.trim() || isLoading"
+                                        :class="{ 'is-loading': isLoading }">
+                                        <span class="icon">
+                                            <i class="fas fa-check-shield"></i>
+                                        </span>
+                                        <span>Verify Signature</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Verification Results -->
+                            <div x-show="verificationStatus.message" class="notification mt-4"
+                                 :class="verificationStatus.type">
+                                <button class="delete" @click="verificationStatus.message = ''"></button>
+                                <div x-html="verificationStatus.message"></div>
+                            </div>
+                        </div>
+
+                        <!-- Information Section -->
+                        <div class="notification is-light mt-5">
+                            <h4 class="title is-6">
+                                <i class="fas fa-question-circle mr-1"></i>
+                                What is JWT?
+                            </h4>
+                            <p><strong>JSON Web Token (JWT)</strong> is a compact, URL-safe means of representing claims between two parties. It consists of three Base64-encoded parts separated by dots:</p>
+                            <ul class="mt-2">
+                                <li><strong>Header:</strong> Contains the token type and signing algorithm</li>
+                                <li><strong>Payload:</strong> Contains the claims (statements about an entity and additional data)</li>
+                                <li><strong>Signature:</strong> Used to verify the token hasn't been changed</li>
+                            </ul>
+                        </div>
                     </div>
-                </div>
-            </div>
-
-            <!-- 右侧：解码后信息 -->
-            <div class="column">
-                <label class="label">Decoded Token</label>
-                <div class="box" x-show="decodedHeader">
-                    <h2 class="subtitle is-5 has-text-weight-bold has-text-info">Header</h2>
-                    <pre><code x-text="prettyPrint(decodedHeader)"></code></pre>
-                </div>
-                <div class="box" x-show="decodedPayload">
-                    <h2 class="subtitle is-5 has-text-weight-bold has-text-success">Payload</h2>
-                    <pre><code x-text="prettyPrint(decodedPayload)"></code></pre>
-                </div>
-                <div class="notification is-danger" x-show="decodeError">
-                    <p x-text="decodeError"></p>
-                </div>
-            </div>
-        </div>
-
-        <hr>
-
-        <!-- 下方：签名验证 -->
-        <div class="card">
-            <header class="card-header">
-                <p class="card-header-title">
-                    签名验证 (Signature Verification)
-                </p>
-            </header>
-            <div class="card-content">
-                <div class="field">
-                    <label for="jwksUrl" class="label">JWKS URL</label>
-                    <div class="control" :class="{ 'is-loading': isFetchingJwksUrl }">
-                        <input
-                            id="jwksUrl"
-                            class="input"
-                            type="url"
-                            placeholder="例如: https://www.googleapis.com/oauth2/v3/certs"
-                            x-model="jwksUrl"
-                        >
-                    </div>
-                    <p class="help is-info" x-show="isFetchingJwksUrl" x-transition>
-                        正在从 Issuer 自动发现 JWKS URL...
-                    </p>
-                </div>
-                
-                <div class="field">
-                    <div class="control">
-                        <button
-                            class="button is-primary is-fullwidth"
-                            @click="verifySignature"
-                            :disabled="!jwtInput || !jwksUrl || isLoading"
-                            :class="{ 'is-loading': isLoading }"
-                        >
-                            验证签名
-                        </button>
-                    </div>
-                </div>
-
-                <!-- 验证结果通知 -->
-                <div
-                    class="notification"
-                    x-show="verificationStatus.message"
-                    :class="verificationStatus.type"
-                    x-transition
-                >
-                    <button class="delete" @click="verificationStatus.message = ''"></button>
-                    <p x-text="verificationStatus.message"></p>
                 </div>
             </div>
         </div>
     </div>
-</section>
 
-<script>
-    function jwtTools() {
-        return {
-            jwtInput: '',
-            decodedHeader: null,
-            decodedPayload: null,
-            decodeError: '',
-            
-            jwksUrl: '',
-            isFetchingJwksUrl: false, // 新增：用于显示加载状态
-            isLoading: false,
-            verificationStatus: {
-                message: '',
-                type: '' // 'is-success', 'is-danger'
-            },
+    <script>
+        function jwtApp() {
+            return {
+                jwtInput: '',
+                decodedHeader: null,
+                decodedPayload: null,
+                decodeError: '',
+                showResults: false,
+                
+                jwksUrl: '',
+                isFetchingJwksUrl: false,
+                isLoading: false,
+                verificationStatus: {
+                    message: '',
+                    type: ''
+                },
 
-            prettyPrint(jsonObj) {
-                if (!jsonObj) return '';
-                return JSON.stringify(jsonObj, null, 2);
-            },
+                prettyPrint(jsonObj) {
+                    if (!jsonObj) return '';
+                    return JSON.stringify(jsonObj, null, 2);
+                },
 
-            // ✨ --- 方法已增强 --- ✨
-            async decodeJwt() {
-                this.decodeError = '';
-                this.decodedHeader = null;
-                this.decodedPayload = null;
-                this.verificationStatus.message = '';
-
-                if (!this.jwtInput.trim()) {
-                    return;
-                }
-
-                const parts = this.jwtInput.split('.');
-                if (parts.length !== 3) {
-                    this.decodeError = '错误：JWT 格式不正确，必须包含三个由 "." 分隔的部分。';
-                    return;
-                }
-
-                try {
-                    this.decodedHeader = JSON.parse(atob(parts[0].replace(/-/g, '+').replace(/_/g, '/')));
-                    this.decodedPayload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
-
-                    // ✨ 新增：自动发现 JWKS URL
-                    if (this.decodedPayload && this.decodedPayload.iss) {
-                        await this.discoverJwksUrl(this.decodedPayload.iss);
+                formatTimestamp(timestamp) {
+                    if (!timestamp) return '';
+                    try {
+                        const date = new Date(timestamp * 1000);
+                        return date.toLocaleString() + ` (${Math.floor((Date.now() / 1000) - timestamp) > 0 ? 'expired' : 'valid'})`;
+                    } catch (e) {
+                        return 'Invalid timestamp';
                     }
+                },
 
-                } catch (e) {
-                    this.decodeError = `解码失败：${e.message}。请检查 Token 是否有效。`;
+                async decodeJwt() {
+                    this.decodeError = '';
                     this.decodedHeader = null;
                     this.decodedPayload = null;
-                }
-            },
+                    this.verificationStatus.message = '';
+                    this.showResults = false;
 
-            // ✨ --- 新增方法：用于发现 JWKS URL --- ✨
-            async discoverJwksUrl(issuer) {
-                // 确保 issuer 是一个有效的 URL 前缀
-                if (!issuer.startsWith('http')) {
-                    console.warn('Issuer is not a valid URL, cannot discover JWKS URL.');
-                    return;
-                }
-                
-                // 去掉末尾的斜杠，以防重复
-                const discoveryUrl = `${issuer.replace(/\/$/, '')}/.well-known/openid-configuration`;
-                this.isFetchingJwksUrl = true;
-                
-                try {
-                    const response = await fetch(discoveryUrl);
-                    if (!response.ok) {
-                        throw new Error(`Failed to fetch discovery document: ${response.statusText}`);
+                    if (!this.jwtInput.trim()) {
+                        return;
                     }
-                    const config = await response.json();
-                    if (config.jwks_uri) {
-                        this.jwksUrl = config.jwks_uri;
-                        console.log('Successfully discovered JWKS URL:', this.jwksUrl);
-                    } else {
-                        console.warn('Discovery document found, but "jwks_uri" key is missing.');
+
+                    const parts = this.jwtInput.trim().split('.');
+                    if (parts.length !== 3) {
+                        this.decodeError = 'Invalid JWT format. A JWT must contain exactly three parts separated by dots (header.payload.signature).';
+                        return;
                     }
-                } catch (error) {
-                    // 静默失败，因为这只是一个辅助功能，用户仍然可以手动输入
-                    console.error('Failed to discover JWKS URL:', error);
-                } finally {
-                    this.isFetchingJwksUrl = false;
-                }
-            },
 
-            async verifySignature() {
-                this.isLoading = true;
-                this.verificationStatus = { message: '', type: '' };
+                    try {
+                        // Decode header
+                        const headerDecoded = this.base64UrlDecode(parts[0]);
+                        this.decodedHeader = JSON.parse(headerDecoded);
 
-                try {
-                    const JWKS = jose.createRemoteJWKSet(new URL(this.jwksUrl));
-                    const { payload, protectedHeader } = await jose.jwtVerify(this.jwtInput, JWKS);
+                        // Decode payload
+                        const payloadDecoded = this.base64UrlDecode(parts[1]);
+                        this.decodedPayload = JSON.parse(payloadDecoded);
+
+                        this.showResults = true;
+
+                        // Auto-discover JWKS URL if issuer is present
+                        if (this.decodedPayload && this.decodedPayload.iss) {
+                            console.log('Starting JWKS URL discovery for issuer:', this.decodedPayload.iss);
+                            await this.discoverJwksUrl(this.decodedPayload.iss);
+                        } else {
+                            console.log('No issuer found in payload, skipping JWKS URL discovery');
+                        }
+
+                    } catch (e) {
+                        this.decodeError = `Decoding failed: ${e.message}. Please verify that the token is valid.`;
+                        this.decodedHeader = null;
+                        this.decodedPayload = null;
+                    }
+                },
+
+                base64UrlDecode(str) {
+                    // Convert base64url to base64
+                    str = str.replace(/-/g, '+').replace(/_/g, '/');
+                    // Pad with = if necessary
+                    while (str.length % 4) {
+                        str += '=';
+                    }
+                    try {
+                        return atob(str);
+                    } catch (e) {
+                        throw new Error('Invalid base64 encoding');
+                    }
+                },
+
+                async discoverJwksUrl(issuer) {
+                    console.log('discoverJwksUrl called with issuer:', issuer);
                     
-                    this.verificationStatus = {
-                        message: '✅ 签名验证成功！Token 有效。',
-                        type: 'is-success'
-                    };
-
-                } catch (error) {
-                    console.error('Verification failed:', error);
-                    let errorMessage = `❌ 签名验证失败: ${error.message}`;
-                    if (error.code === 'ERR_JWKS_NO_MATCHING_KEY') {
-                        errorMessage = '❌ 验证失败: 在提供的 JWKS URL 中找不到与此 JWT (kid) 匹配的公钥。';
-                    } else if (error.code === 'ERR_JWT_SIGNATURE_VERIFICATION_FAILED') {
-                        errorMessage = '❌ 验证失败: 签名不匹配，Token 可能已被篡改或使用了错误的密钥。';
-                    } else if (error.code === 'ERR_JWT_EXPIRED') {
-                        errorMessage = '❌ 验证失败: Token 已过期。';
-                    } else if (error.name === 'TypeError' && error.message.includes('fetch')) {
-                        errorMessage = '❌ 网络错误: 无法获取 JWKS URL，请检查网络连接或 URL 是否正确（可能存在 CORS 跨域问题）。';
+                    if (!issuer || !issuer.startsWith('http')) {
+                        console.warn('Issuer is not a valid URL, cannot discover JWKS URL:', issuer);
+                        return;
                     }
+                    
+                    const discoveryUrl = `${issuer.replace(/\/$/, '')}/.well-known/openid-configuration`;
+                    console.log('Discovery URL:', discoveryUrl);
+                    
+                    this.isFetchingJwksUrl = true;
+                    
+                    // Clear any previous JWKS URL
+                    this.jwksUrl = '';
+                    
+                    try {
+                        console.log('Fetching OpenID configuration from:', discoveryUrl);
+                        const response = await fetch(discoveryUrl);
+                        
+                        if (!response.ok) {
+                            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                        }
+                        
+                        const config = await response.json();
+                        console.log('OpenID configuration received:', config);
+                        
+                        if (config.jwks_uri) {
+                            this.jwksUrl = config.jwks_uri;
+                            console.log('✅ JWKS URL successfully set to:', this.jwksUrl);
+                            
+                            // Show brief success message
+                            const originalError = this.decodeError;
+                            if (!originalError) {
+                                this.decodeError = `✓ JWKS URL auto-discovered: ${config.jwks_uri}`;
+                                setTimeout(() => {
+                                    this.decodeError = '';
+                                }, 3000);
+                            }
+                        } else {
+                            console.warn('❌ Discovery document found, but "jwks_uri" key is missing:', config);
+                        }
+                    } catch (error) {
+                        console.error('❌ Failed to discover JWKS URL:', error);
+                        console.error('Error details:', {
+                            message: error.message,
+                            discoveryUrl: discoveryUrl,
+                            issuer: issuer
+                        });
+                        // Don't show error to user as this is optional functionality
+                    } finally {
+                        this.isFetchingJwksUrl = false;
+                        console.log('JWKS discovery completed. Final JWKS URL:', this.jwksUrl);
+                    }
+                },
 
-                    this.verificationStatus = {
-                        message: errorMessage,
-                        type: 'is-danger'
-                    };
-                } finally {
-                    this.isLoading = false;
+                async verifySignature() {
+                    this.isLoading = true;
+                    this.verificationStatus = { message: '', type: '' };
+
+                    try {
+                        const JWKS = jose.createRemoteJWKSet(new URL(this.jwksUrl));
+                        const { payload, protectedHeader } = await jose.jwtVerify(this.jwtInput.trim(), JWKS);
+                        
+                        this.verificationStatus = {
+                            message: `
+                                <div class="content">
+                                    <p><strong><i class="fas fa-check-circle"></i> Signature verification successful!</strong></p>
+                                    <p>The token is valid and has not been tampered with.</p>
+                                    <ul>
+                                        <li><strong>Algorithm:</strong> ${protectedHeader.alg}</li>
+                                        <li><strong>Key ID:</strong> ${protectedHeader.kid || 'Not specified'}</li>
+                                        <li><strong>Verification Time:</strong> ${new Date().toLocaleString()}</li>
+                                    </ul>
+                                </div>
+                            `,
+                            type: 'is-success'
+                        };
+
+                    } catch (error) {
+                        console.error('Verification failed:', error);
+                        let errorMessage = `<div class="content"><p><strong><i class="fas fa-times-circle"></i> Signature verification failed</strong></p>`;
+                        
+                        if (error.code === 'ERR_JWKS_NO_MATCHING_KEY') {
+                            errorMessage += '<p>No matching key found in the provided JWKS URL for this JWT\'s Key ID (kid).</p>';
+                        } else if (error.code === 'ERR_JWT_SIGNATURE_VERIFICATION_FAILED') {
+                            errorMessage += '<p>Signature does not match. The token may have been tampered with or signed with a different key.</p>';
+                        } else if (error.code === 'ERR_JWT_EXPIRED') {
+                            errorMessage += '<p>The token has expired and is no longer valid.</p>';
+                        } else if (error.name === 'TypeError' && error.message.includes('fetch')) {
+                            errorMessage += '<p>Network error: Unable to fetch JWKS URL. Please check your network connection or URL correctness (CORS issues may apply).</p>';
+                        } else {
+                            errorMessage += `<p>Error details: ${error.message}</p>`;
+                        }
+                        
+                        errorMessage += '</div>';
+
+                        this.verificationStatus = {
+                            message: errorMessage,
+                            type: 'is-danger'
+                        };
+                    } finally {
+                        this.isLoading = false;
+                    }
+                },
+
+                copyToClipboard(text) {
+                    if (!text) return;
+                    
+                    navigator.clipboard.writeText(text).then(() => {
+                        this.showCopySuccess();
+                    }).catch(err => {
+                        // Fallback for older browsers
+                        const textarea = document.createElement('textarea');
+                        textarea.value = text;
+                        document.body.appendChild(textarea);
+                        textarea.select();
+                        document.execCommand('copy');
+                        document.body.removeChild(textarea);
+                        this.showCopySuccess();
+                    });
+                },
+
+                copyToken() {
+                    this.copyToClipboard(this.jwtInput.trim());
+                },
+
+                showCopySuccess() {
+                    // Brief success indication
+                    const originalError = this.decodeError;
+                    if (!originalError) {
+                        this.decodeError = '✓ Copied to clipboard!';
+                        setTimeout(() => {
+                            this.decodeError = '';
+                        }, 1500);
+                    }
+                },
+
+                clearAll() {
+                    this.jwtInput = '';
+                    this.decodedHeader = null;
+                    this.decodedPayload = null;
+                    this.decodeError = '';
+                    this.showResults = false;
+                    this.jwksUrl = '';
+                    this.verificationStatus = { message: '', type: '' };
                 }
             }
         }
-    }
-</script>
+    </script>
 
 </body>
 </html>

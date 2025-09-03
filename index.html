@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebTools Collection - Developer Utilities</title>
+    <!-- Bulma CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Alpine.js -->
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>
+        .hero-gradient {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .tool-card {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+        .tool-card .card-content {
+            flex-grow: 1;
+        }
+        .tool-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+        .tool-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+        .feature-list {
+            text-align: left;
+        }
+        .feature-list li {
+            margin-bottom: 0.5rem;
+        }
+        .footer-gradient {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        }
+        .stats-section {
+            background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+        }
+    </style>
+</head>
+<body>
+    <div x-data="portalApp()">
+        <!-- Hero Section -->
+        <section class="hero hero-gradient" style="padding: 2rem 0; position: relative;">
+            <div class="hero-body" style="padding: 1.5rem 0;">
+                <div class="container has-text-centered">
+                    <h1 class="title is-3 has-text-white mb-2">
+                        <i class="fas fa-tools mr-2"></i>
+                        WebTools Collection
+                    </h1>
+                </div>
+                <!-- Watermark -->
+                <div class="is-hidden-mobile" style="position: absolute; top: 15px; right: 20px;">
+                    <span class="tag is-white-ter is-small has-text-dark">
+                        <i class="fas fa-robot mr-1"></i>
+                        Fully created with GitHub Copilot and Claude Sonnet 4
+                    </span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Tools Section -->
+        <section id="tools-section" class="section">
+            <div class="container">
+                <div class="has-text-centered mb-5">
+                    <h2 class="title is-3">
+                        <i class="fas fa-wrench mr-2"></i>
+                        Available Tools
+                    </h2>
+                </div>
+
+                <!-- Category Filter -->
+                <div class="has-text-centered mb-5">
+                    <div class="field is-grouped is-grouped-centered">
+                        <div class="control">
+                            <div class="select">
+                                <select x-model="selectedCategory" @change="filterTools()">
+                                    <option value="all">All Categories</option>
+                                    <template x-for="category in categories" :key="category">
+                                        <option :value="category" x-text="category"></option>
+                                    </template>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="control">
+                            <input 
+                                x-model="searchQuery" 
+                                @input="filterTools()"
+                                class="input" 
+                                type="text" 
+                                placeholder="Search tools...">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tools Grid -->
+                <div class="columns is-multiline">
+                    <template x-for="tool in filteredTools" :key="tool.id">
+                        <div class="column is-6-tablet is-4-desktop">
+                            <div class="card tool-card">
+                                <div class="card-content has-text-centered">
+                                    <div class="tool-icon" :class="tool.iconClass">
+                                        <i :class="tool.icon"></i>
+                                    </div>
+                                    <h3 class="title is-4" x-text="tool.name"></h3>
+                                    <p class="subtitle is-6" x-text="tool.description"></p>
+                                    
+                                    <div class="tags is-centered mb-4">
+                                        <span class="tag is-primary" x-text="tool.category"></span>
+                                        <template x-for="tag in tool.tags" :key="tag">
+                                            <span class="tag is-light" x-text="tag"></span>
+                                        </template>
+                                    </div>
+
+                                    <div class="content feature-list">
+                                        <p class="has-text-weight-semibold mb-2">Key Features:</p>
+                                        <ul>
+                                            <template x-for="feature in tool.features" :key="feature">
+                                                <li x-text="feature"></li>
+                                            </template>
+                                        </ul>
+                                    </div>
+                                </div>
+                                <footer class="card-footer">
+                                    <a :href="tool.url" class="card-footer-item button is-primary is-outlined">
+                                        <span class="icon">
+                                            <i class="fas fa-external-link-alt"></i>
+                                        </span>
+                                        <span>Open Tool</span>
+                                    </a>
+                                </footer>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+
+                <!-- No Results Message -->
+                <div x-show="filteredTools.length === 0" class="has-text-centered">
+                    <div class="notification is-warning is-light">
+                        <i class="fas fa-search fa-2x mb-3"></i>
+                        <p class="title is-4">No tools found</p>
+                        <p class="subtitle">Try adjusting your search or category filter</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- About Section -->
+        <section class="section">
+            <div class="container">
+                <div class="columns is-centered">
+                    <div class="column is-8">
+                        <div class="card">
+                            <div class="card-content has-text-centered">
+                                <h2 class="title is-3">
+                                    <i class="fas fa-info-circle mr-2"></i>
+                                    About WebTools Collection
+                                </h2>
+                                <div class="content">
+                                    <p class="is-size-5">
+                                        This collection provides essential web-based utilities for developers and technical professionals. 
+                                        All tools are built with modern web technologies and run entirely in your browser for 
+                                        privacy and convenience.
+                                    </p>
+                                    
+                                    <div class="columns mt-5">
+                                        <div class="column">
+                                            <h4 class="title is-5">
+                                                <i class="fas fa-shield-alt mr-2"></i>
+                                                Privacy First
+                                            </h4>
+                                            <p>All processing happens in your browser. No data is sent to external servers.</p>
+                                        </div>
+                                        <div class="column">
+                                            <h4 class="title is-5">
+                                                <i class="fas fa-rocket mr-2"></i>
+                                                Fast & Responsive
+                                            </h4>
+                                            <p>Lightweight tools built with Alpine.js and Bulma for optimal performance.</p>
+                                        </div>
+                                        <div class="column">
+                                            <h4 class="title is-5">
+                                                <i class="fas fa-mobile-alt mr-2"></i>
+                                                Mobile Friendly
+                                            </h4>
+                                            <p>Responsive design ensures great experience on all devices.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Quick Access -->
+        <section class="section footer-gradient">
+            <div class="container">
+                <div class="has-text-centered">
+                    <h2 class="title is-3 mb-5">
+                        <i class="fas fa-bolt mr-2"></i>
+                        Quick Access
+                    </h2>
+                    <div class="buttons is-centered">
+                        <template x-for="tool in tools" :key="tool.id">
+                            <a :href="tool.url" class="button is-large" :class="tool.buttonClass">
+                                <span class="icon">
+                                    <i :class="tool.icon"></i>
+                                </span>
+                                <span x-text="tool.name"></span>
+                            </a>
+                        </template>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="footer has-background-dark">
+            <div class="content has-text-centered has-text-white">
+                <p class="is-size-5">
+                    <strong class="has-text-white">WebTools Collection</strong>
+                </p>
+                <p>
+                    Built with <i class="fas fa-heart has-text-danger"></i> using 
+                    <a href="https://alpinejs.dev" class="has-text-link">Alpine.js</a> and 
+                    <a href="https://bulma.io" class="has-text-link">Bulma</a>
+                </p>
+                <p class="is-size-7 mt-3">
+                    <i class="fas fa-clock mr-1"></i>
+                    Last updated: <span x-text="new Date().toLocaleDateString()"></span>
+                </p>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        function portalApp() {
+            return {
+                selectedCategory: 'all',
+                searchQuery: '',
+                filteredTools: [],
+                
+                tools: [
+                    {
+                        id: 'jwt-tool',
+                        name: 'JWT Decoder & Verifier',
+                        description: 'Decode JWT tokens and verify signatures with auto-discovery',
+                        category: 'Security',
+                        url: 'jwt.html',
+                        icon: 'fas fa-key',
+                        iconClass: 'has-text-warning',
+                        buttonClass: 'is-warning',
+                        tags: ['JWT', 'Authentication', 'Security'],
+                        features: [
+                            'Decode JWT headers and payloads',
+                            'Auto-discover JWKS URLs from issuers',
+                            'Signature verification with remote keys',
+                            'Token information analysis',
+                            'Copy functionality for all sections'
+                        ]
+                    },
+                    {
+                        id: 'string-encoder',
+                        name: 'String Encoder/Decoder',
+                        description: 'Encode and decode strings using various formats',
+                        category: 'Encoding',
+                        url: 'string-encoder.html',
+                        icon: 'fas fa-code',
+                        iconClass: 'has-text-info',
+                        buttonClass: 'is-info',
+                        tags: ['Base64', 'URI', 'Hex', 'Encoding'],
+                        features: [
+                            'Base64 encoding/decoding',
+                            'URI component encoding',
+                            'Binary to Hex conversion',
+                            'Real-time conversion',
+                            'Copy to clipboard functionality'
+                        ]
+                    }
+                ],
+
+                get categories() {
+                    return [...new Set(this.tools.map(tool => tool.category))];
+                },
+
+                init() {
+                    this.filterTools();
+                },
+
+                filterTools() {
+                    let filtered = this.tools;
+
+                    // Filter by category
+                    if (this.selectedCategory !== 'all') {
+                        filtered = filtered.filter(tool => tool.category === this.selectedCategory);
+                    }
+
+                    // Filter by search query
+                    if (this.searchQuery.trim()) {
+                        const query = this.searchQuery.toLowerCase();
+                        filtered = filtered.filter(tool => 
+                            tool.name.toLowerCase().includes(query) ||
+                            tool.description.toLowerCase().includes(query) ||
+                            tool.tags.some(tag => tag.toLowerCase().includes(query)) ||
+                            tool.features.some(feature => feature.toLowerCase().includes(query))
+                        );
+                    }
+
+                    this.filteredTools = filtered;
+                }
+            }
+        }
+    </script>
+</body>
+</html>
