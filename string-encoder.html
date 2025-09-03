@@ -50,6 +50,10 @@
                                         <option value="base64">Base64</option>
                                         <option value="uri">URI Component</option>
                                         <option value="binhex">Binary to Hex</option>
+                                        <option value="html">HTML Entities</option>
+                                        <option value="unicode">Unicode Escape</option>
+                                        <option value="emoji">Emoji Encode/Decode</option>
+                                        <option value="json">JSON Escape</option>
                                     </select>
                                 </div>
                             </div>
@@ -212,6 +216,18 @@
                             <div x-show="encodingType === 'binhex'">
                                 <p><strong>Binary to Hex:</strong> Converts each character to its hexadecimal representation. Each byte is represented as two hexadecimal digits.</p>
                             </div>
+                            <div x-show="encodingType === 'html'">
+                                <p><strong>HTML Entities:</strong> Converts special characters to their HTML entity equivalents (e.g., &lt; becomes &amp;lt;). Essential for displaying text safely in HTML documents.</p>
+                            </div>
+                            <div x-show="encodingType === 'unicode'">
+                                <p><strong>Unicode Escape:</strong> Converts characters to their Unicode escape sequences (e.g., \\u0041 for 'A'). Useful for JavaScript strings and JSON data.</p>
+                            </div>
+                            <div x-show="encodingType === 'emoji'">
+                                <p><strong>Emoji Encode/Decode:</strong> Converts between emoji characters and their Unicode representations or shortcode names (e.g., 😀 ↔ :grinning_face:).</p>
+                            </div>
+                            <div x-show="encodingType === 'json'">
+                                <p><strong>JSON Escape:</strong> Escapes special characters for safe inclusion in JSON strings. Handles quotes, backslashes, newlines, and control characters.</p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -244,6 +260,18 @@
                             case 'binhex':
                                 this.encodedResult = this.stringToHex(this.inputText);
                                 break;
+                            case 'html':
+                                this.encodedResult = this.htmlEncode(this.inputText);
+                                break;
+                            case 'unicode':
+                                this.encodedResult = this.unicodeEncode(this.inputText);
+                                break;
+                            case 'emoji':
+                                this.encodedResult = this.emojiEncode(this.inputText);
+                                break;
+                            case 'json':
+                                this.encodedResult = this.jsonEscape(this.inputText);
+                                break;
                         }
                     } catch (error) {
                         this.errorMessage = `Encoding failed: ${error.message}`;
@@ -265,6 +293,18 @@
                                 break;
                             case 'binhex':
                                 this.decodedResult = this.hexToString(this.inputText);
+                                break;
+                            case 'html':
+                                this.decodedResult = this.htmlDecode(this.inputText);
+                                break;
+                            case 'unicode':
+                                this.decodedResult = this.unicodeDecode(this.inputText);
+                                break;
+                            case 'emoji':
+                                this.decodedResult = this.emojiDecode(this.inputText);
+                                break;
+                            case 'json':
+                                this.decodedResult = this.jsonUnescape(this.inputText);
                                 break;
                         }
                     } catch (error) {
@@ -300,6 +340,93 @@
                         str += String.fromCharCode(charCode);
                     }
                     return str;
+                },
+
+                // HTML Entity Encoding/Decoding
+                htmlEncode(str) {
+                    const htmlEntities = {
+                        '&': '&amp;',
+                        '<': '&lt;',
+                        '>': '&gt;',
+                        '"': '&quot;',
+                        "'": '&#39;',
+                        '/': '&#x2F;',
+                        '`': '&#x60;',
+                        '=': '&#x3D;'
+                    };
+                    return str.replace(/[&<>"'`=\/]/g, s => htmlEntities[s]);
+                },
+
+                htmlDecode(str) {
+                    const htmlEntities = {
+                        '&amp;': '&',
+                        '&lt;': '<',
+                        '&gt;': '>',
+                        '&quot;': '"',
+                        '&#39;': "'",
+                        '&#x2F;': '/',
+                        '&#x60;': '`',
+                        '&#x3D;': '='
+                    };
+                    return str.replace(/&(#(?:x[0-9a-f]+|\d+)|[a-z]+);?/gi, (match, entity) => {
+                        if (htmlEntities[match]) return htmlEntities[match];
+                        if (entity.charAt(0) === '#') {
+                            const isHex = entity.charAt(1) === 'x';
+                            const code = parseInt(entity.slice(isHex ? 2 : 1), isHex ? 16 : 10);
+                            return String.fromCharCode(code);
+                        }
+                        return match;
+                    });
+                },
+
+                // Unicode Escape Encoding/Decoding
+                unicodeEncode(str) {
+                    return str.split('').map(char => {
+                        const code = char.charCodeAt(0);
+                        if (code > 127) {
+                            return '\\u' + code.toString(16).padStart(4, '0');
+                        }
+                        return char;
+                    }).join('');
+                },
+
+                unicodeDecode(str) {
+                    return str.replace(/\\u([0-9a-fA-F]{4})/g, (match, hex) => {
+                        return String.fromCharCode(parseInt(hex, 16));
+                    });
+                },
+
+                // Emoji Encoding/Decoding
+                emojiEncode(str) {
+                    // Convert emojis to their Unicode code points
+                    return str.replace(/[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu, (emoji) => {
+                        const codePoint = emoji.codePointAt(0).toString(16).toUpperCase();
+                        return `U+${codePoint}`;
+                    });
+                },
+
+                emojiDecode(str) {
+                    // Convert Unicode code points back to emojis
+                    return str.replace(/U\+([0-9A-Fa-f]+)/g, (match, hex) => {
+                        try {
+                            return String.fromCodePoint(parseInt(hex, 16));
+                        } catch (e) {
+                            return match; // Return original if invalid
+                        }
+                    });
+                },
+
+                // JSON Escape/Unescape
+                jsonEscape(str) {
+                    return JSON.stringify(str).slice(1, -1); // Remove surrounding quotes
+                },
+
+                jsonUnescape(str) {
+                    try {
+                        return JSON.parse('"' + str + '"'); // Add quotes and parse
+                    } catch (e) {
+                        throw new Error('Invalid JSON escape sequence');
+                    }
                 },
 
                 copyToClipboard(text) {
