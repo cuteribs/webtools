@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Code Generator & Scanner</title>
+    <!-- Bulma CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Alpine.js -->
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <!-- QRCode.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <!-- jsQR for scanning -->
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <style>
+        .qr-output {
+            background-color: #ffffff;
+            padding: 1.5rem;
+            border-radius: 4px;
+            border: 2px dashed #dbdbdb;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 280px;
+        }
+        .qr-output canvas {
+            image-rendering: pixelated;
+        }
+        .scan-area {
+            background-color: #f5f5f5;
+            padding: 1.5rem;
+            border-radius: 4px;
+            border: 2px dashed #dbdbdb;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 300px;
+        }
+        #video {
+            width: 100%;
+            max-width: 500px;
+            border-radius: 4px;
+            border: 2px solid #3273dc;
+        }
+        #canvas {
+            display: none;
+        }
+        .decoded-text {
+            background-color: #f5f5f5;
+            padding: 1rem;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 1rem;
+            word-break: break-all;
+            border: 1px solid #e0e0e0;
+        }
+        .success-message {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            animation: slideIn 0.3s ease;
+        }
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        .history-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 0.75rem;
+            border-bottom: 1px solid #e0e0e0;
+            transition: background-color 0.2s ease;
+        }
+        .history-item:hover {
+            background-color: #f9f9f9;
+        }
+        .history-item:last-child {
+            border-bottom: none;
+        }
+        .history-timestamp {
+            font-size: 0.8rem;
+            color: #7a7a7a;
+            white-space: nowrap;
+            min-width: 140px;
+        }
+        .history-text {
+            flex-grow: 1;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            color: #363636;
+            word-break: break-all;
+        }
+        .qr-preview {
+            max-width: 100px;
+            flex-shrink: 0;
+        }
+        .tabs {
+            margin-bottom: 1.5rem;
+        }
+        .file-preview {
+            max-width: 100%;
+            max-height: 400px;
+            border-radius: 4px;
+            margin-top: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div x-data="qrApp()" class="container mt-5">
+        <div class="columns is-centered">
+            <div class="column is-10">
+                <!-- Header -->
+                <div class="has-text-centered mb-5">
+                    <h1 class="title is-2">
+                        <i class="fas fa-qrcode mr-2"></i>
+                        QR Code Generator & Scanner
+                    </h1>
+                    <p class="subtitle is-5">Generate QR codes from text or scan QR codes from images/camera</p>
+                </div>
+
+                <!-- Tabs -->
+                <div class="tabs is-centered is-boxed">
+                    <ul>
+                        <li :class="{ 'is-active': activeTab === 'generate' }">
+                            <a @click="activeTab = 'generate'">
+                                <span class="icon is-small"><i class="fas fa-pencil-alt"></i></span>
+                                <span>Generate QR Code</span>
+                            </a>
+                        </li>
+                        <li :class="{ 'is-active': activeTab === 'scan' }">
+                            <a @click="activeTab = 'scan'; stopCamera()">
+                                <span class="icon is-small"><i class="fas fa-camera"></i></span>
+                                <span>Scan QR Code</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Generate Tab -->
+                <div x-show="activeTab === 'generate'" class="card">
+                    <div class="card-content">
+                        <h2 class="title is-4 mb-4">
+                            <i class="fas fa-pencil-alt mr-2"></i>
+                            Generate QR Code
+                        </h2>
+
+                        <!-- Input Text -->
+                        <div class="field">
+                            <label class="label">Text to Encode</label>
+                            <div class="control">
+                                <textarea 
+                                    x-model="inputText" 
+                                    class="textarea" 
+                                    placeholder="Enter text, URL, or any data to encode into a QR code..."
+                                    rows="4"
+                                    @input="generateQRCode()"></textarea>
+                            </div>
+                            <p class="help" x-text="`${inputText.length} characters`"></p>
+                        </div>
+
+                        <!-- QR Code Size -->
+                        <div class="field">
+                            <label class="label">QR Code Size</label>
+                            <div class="control">
+                                <div class="select is-fullwidth">
+                                    <select x-model.number="qrSize" @change="generateQRCode()">
+                                        <option value="128">Small (128x128)</option>
+                                        <option value="256">Medium (256x256)</option>
+                                        <option value="512">Large (512x512)</option>
+                                        <option value="1024">Extra Large (1024x1024)</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- QR Code Output -->
+                        <div class="field">
+                            <label class="label">Generated QR Code</label>
+                            <div class="qr-output" id="qrcode-container">
+                                <p x-show="!inputText" class="has-text-grey-light">
+                                    <i class="fas fa-qrcode fa-3x"></i>
+                                    <br><br>
+                                    Enter text above to generate a QR code
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="field is-grouped is-grouped-centered mt-4">
+                            <div class="control">
+                                <button 
+                                    @click="downloadQRCode()" 
+                                    :disabled="!inputText"
+                                    class="button is-primary">
+                                    <span class="icon">
+                                        <i class="fas fa-download"></i>
+                                    </span>
+                                    <span>Download QR Code</span>
+                                </button>
+                            </div>
+                            <div class="control">
+                                <button 
+                                    @click="clearGenerate()" 
+                                    class="button is-light">
+                                    <span class="icon">
+                                        <i class="fas fa-eraser"></i>
+                                    </span>
+                                    <span>Clear</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Info Box -->
+                        <div class="notification is-info is-light mt-5">
+                            <p class="mb-2"><strong>About QR Codes:</strong></p>
+                            <ul style="margin-left: 1.5rem;">
+                                <li>QR codes can store up to 4,296 alphanumeric characters</li>
+                                <li>Commonly used for URLs, contact info, WiFi credentials, and more</li>
+                                <li>Can be scanned by any smartphone camera or QR code reader</li>
+                                <li>Higher sizes provide better scanning reliability</li>
+                                <li>QR codes have error correction capability (up to 30% damage)</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Scan Tab -->
+                <div x-show="activeTab === 'scan'" class="card">
+                    <div class="card-content">
+                        <h2 class="title is-4 mb-4">
+                            <i class="fas fa-camera mr-2"></i>
+                            Scan QR Code
+                        </h2>
+
+                        <!-- Scan Options -->
+                        <div class="tabs is-small is-toggle is-fullwidth">
+                            <ul>
+                                <li :class="{ 'is-active': scanMode === 'camera' }">
+                                    <a @click="scanMode = 'camera'; stopCamera(); scannedText = ''">
+                                        <span class="icon is-small"><i class="fas fa-video"></i></span>
+                                        <span>Camera</span>
+                                    </a>
+                                </li>
+                                <li :class="{ 'is-active': scanMode === 'file' }">
+                                    <a @click="scanMode = 'file'; stopCamera(); scannedText = ''">
+                                        <span class="icon is-small"><i class="fas fa-file-image"></i></span>
+                                        <span>Upload Image</span>
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <!-- Camera Scan -->
+                        <div x-show="scanMode === 'camera'">
+                            <div class="field">
+                                <div class="control">
+                                    <button 
+                                        @click="cameraActive ? stopCamera() : startCamera()" 
+                                        class="button is-fullwidth"
+                                        :class="cameraActive ? 'is-danger' : 'is-primary'">
+                                        <span class="icon">
+                                            <i :class="cameraActive ? 'fas fa-stop' : 'fas fa-play'"></i>
+                                        </span>
+                                        <span x-text="cameraActive ? 'Stop Camera' : 'Start Camera'"></span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="scan-area">
+                                <video id="video" x-show="cameraActive" autoplay playsinline></video>
+                                <canvas id="canvas"></canvas>
+                                <div x-show="!cameraActive" class="has-text-centered">
+                                    <p class="has-text-grey-light">
+                                        <i class="fas fa-video fa-3x"></i>
+                                        <br><br>
+                                        Click "Start Camera" to begin scanning
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div x-show="cameraActive" class="notification is-warning is-light mt-3">
+                                <p><i class="fas fa-info-circle"></i> Position the QR code in front of your camera. The scanner will automatically detect and decode it.</p>
+                            </div>
+                        </div>
+
+                        <!-- File Upload Scan -->
+                        <div x-show="scanMode === 'file'">
+                            <div class="field">
+                                <div class="file is-boxed is-primary has-name is-fullwidth">
+                                    <label class="file-label">
+                                        <input 
+                                            class="file-input" 
+                                            type="file" 
+                                            accept="image/*"
+                                            @change="handleFileUpload($event)">
+                                        <span class="file-cta">
+                                            <span class="file-icon">
+                                                <i class="fas fa-upload"></i>
+                                            </span>
+                                            <span class="file-label">
+                                                Choose an image with QR code…
+                                            </span>
+                                        </span>
+                                        <span class="file-name" x-text="uploadedFileName || 'No file selected'">
+                                        </span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div x-show="uploadedImage" class="has-text-centered">
+                                <img :src="uploadedImage" class="file-preview" alt="Uploaded image">
+                            </div>
+                        </div>
+
+                        <!-- Decoded Result -->
+                        <div x-show="scannedText" class="field mt-5">
+                            <label class="label">
+                                <i class="fas fa-check-circle has-text-success"></i>
+                                Decoded Text
+                            </label>
+                            <div class="decoded-text" x-text="scannedText"></div>
+                            <div class="field is-grouped is-grouped-centered mt-3">
+                                <div class="control">
+                                    <button 
+                                        @click="copyToClipboard(scannedText)" 
+                                        class="button is-primary is-outlined">
+                                        <span class="icon">
+                                            <i class="fas fa-copy"></i>
+                                        </span>
+                                        <span>Copy Text</span>
+                                    </button>
+                                </div>
+                                <div x-show="isURL(scannedText)" class="control">
+                                    <a 
+                                        :href="scannedText" 
+                                        target="_blank"
+                                        class="button is-info is-outlined">
+                                        <span class="icon">
+                                            <i class="fas fa-external-link-alt"></i>
+                                        </span>
+                                        <span>Open URL</span>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Info Box -->
+                        <div class="notification is-info is-light mt-5">
+                            <p class="mb-2"><strong>Scanning Tips:</strong></p>
+                            <ul style="margin-left: 1.5rem;">
+                                <li><strong>Camera:</strong> Ensure good lighting and hold steady</li>
+                                <li><strong>Image:</strong> Upload clear images in JPG, PNG, or other formats</li>
+                                <li>Works with standard QR codes and most 2D barcodes</li>
+                                <li>All scanning is done locally in your browser (no data sent to servers)</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- History Section -->
+                <div x-show="history.length > 0" class="card mt-5">
+                    <header class="card-header">
+                        <p class="card-header-title">
+                            <span class="icon">
+                                <i class="fas fa-history"></i>
+                            </span>
+                            <span>Recent QR Codes</span>
+                            <span class="tag is-small is-light ml-2" x-text="history.length"></span>
+                        </p>
+                        <button class="card-header-icon" @click="clearHistory()" title="Clear History">
+                            <span class="icon">
+                                <i class="fas fa-trash"></i>
+                            </span>
+                        </button>
+                    </header>
+                    <div class="card-content" style="padding: 0; max-height: 400px; overflow-y: auto;">
+                        <template x-for="(item, index) in history" :key="index">
+                            <div class="history-item">
+                                <div class="history-timestamp" x-text="item.timestamp"></div>
+                                <div class="qr-preview">
+                                    <img :src="item.qrImage" :alt="'QR Code ' + index" style="width: 80px; height: 80px;">
+                                </div>
+                                <div class="history-text" x-text="item.text"></div>
+                                <button 
+                                    @click="copyToClipboard(item.text)" 
+                                    class="button is-small is-outlined">
+                                    <span class="icon is-small">
+                                        <i class="fas fa-copy"></i>
+                                    </span>
+                                </button>
+                                <button 
+                                    @click="restoreQRCode(item.text)" 
+                                    class="button is-small is-outlined is-primary">
+                                    <span class="icon is-small">
+                                        <i class="fas fa-redo"></i>
+                                    </span>
+                                </button>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <!-- Back to Home -->
+                <div class="has-text-centered mt-5">
+                    <a href="index.html" class="button is-text">
+                        <span class="icon">
+                            <i class="fas fa-arrow-left"></i>
+                        </span>
+                        <span>Back to WebTools</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Success Message -->
+        <div x-show="showSuccess" 
+             x-transition
+             class="notification is-success success-message">
+            <button class="delete" @click="showSuccess = false"></button>
+            <span x-text="successMessage"></span>
+        </div>
+    </div>
+
+    <script>
+        function qrApp() {
+            return {
+                activeTab: 'generate',
+                scanMode: 'camera',
+                inputText: '',
+                qrSize: 256,
+                qrCodeInstance: null,
+                scannedText: '',
+                cameraActive: false,
+                stream: null,
+                scanInterval: null,
+                uploadedFileName: '',
+                uploadedImage: '',
+                history: [],
+                showSuccess: false,
+                successMessage: '',
+
+                init() {
+                    this.loadHistory();
+                },
+
+                generateQRCode() {
+                    const container = document.getElementById('qrcode-container');
+                    
+                    // Clear previous QR code
+                    const existingQR = container.querySelector('.qrcode-wrapper');
+                    if (existingQR) {
+                        existingQR.remove();
+                    }
+
+                    if (!this.inputText) {
+                        return;
+                    }
+
+                    // Create wrapper div
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'qrcode-wrapper';
+                    container.appendChild(wrapper);
+
+                    // Generate QR code
+                    try {
+                        this.qrCodeInstance = new QRCode(wrapper, {
+                            text: this.inputText,
+                            width: this.qrSize,
+                            height: this.qrSize,
+                            colorDark: '#000000',
+                            colorLight: '#ffffff',
+                            correctLevel: QRCode.CorrectLevel.H
+                        });
+
+                        // Add to history
+                        setTimeout(() => {
+                            const canvas = wrapper.querySelector('canvas');
+                            if (canvas) {
+                                this.addToHistory(this.inputText, canvas.toDataURL());
+                            }
+                        }, 100);
+                    } catch (error) {
+                        console.error('Error generating QR code:', error);
+                        this.showSuccessMessage('Error generating QR code', 'is-danger');
+                    }
+                },
+
+                downloadQRCode() {
+                    const canvas = document.querySelector('#qrcode-container canvas');
+                    if (!canvas) {
+                        this.showSuccessMessage('No QR code to download', 'is-warning');
+                        return;
+                    }
+
+                    try {
+                        const url = canvas.toDataURL('image/png');
+                        const link = document.createElement('a');
+                        link.download = 'qrcode.png';
+                        link.href = url;
+                        link.click();
+                        this.showSuccessMessage('QR code downloaded!');
+                    } catch (error) {
+                        console.error('Error downloading QR code:', error);
+                        this.showSuccessMessage('Error downloading QR code', 'is-danger');
+                    }
+                },
+
+                clearGenerate() {
+                    this.inputText = '';
+                    const container = document.getElementById('qrcode-container');
+                    const existingQR = container.querySelector('.qrcode-wrapper');
+                    if (existingQR) {
+                        existingQR.remove();
+                    }
+                },
+
+                async startCamera() {
+                    const video = document.getElementById('video');
+                    const canvas = document.getElementById('canvas');
+                    const canvasContext = canvas.getContext('2d');
+
+                    try {
+                        this.stream = await navigator.mediaDevices.getUserMedia({ 
+                            video: { facingMode: 'environment' } 
+                        });
+                        video.srcObject = this.stream;
+                        this.cameraActive = true;
+
+                        // Wait for video to be ready before starting scanning
+                        video.onloadedmetadata = () => {
+                            video.play();
+                            
+                            // Start scanning after a short delay to ensure video is ready
+                            setTimeout(() => {
+                                this.scanInterval = setInterval(() => {
+                                    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                                        canvas.width = video.videoWidth;
+                                        canvas.height = video.videoHeight;
+                                        canvasContext.drawImage(video, 0, 0, canvas.width, canvas.height);
+                                        
+                                        const imageData = canvasContext.getImageData(0, 0, canvas.width, canvas.height);
+                                        const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                                            inversionAttempts: 'dontInvert',
+                                        });
+
+                                        if (code) {
+                                            this.scannedText = code.data;
+                                            this.logScannedCode(code.data);
+                                            this.stopCamera();
+                                            this.showSuccessMessage('QR code detected!');
+                                        }
+                                    }
+                                }, 100);
+                            }, 300);
+                        };
+                    } catch (error) {
+                        console.error('Error accessing camera:', error);
+                        this.showSuccessMessage('Error accessing camera. Please check permissions.', 'is-danger');
+                        this.cameraActive = false;
+                    }
+                },
+
+                stopCamera() {
+                    if (this.stream) {
+                        this.stream.getTracks().forEach(track => track.stop());
+                        this.stream = null;
+                    }
+                    if (this.scanInterval) {
+                        clearInterval(this.scanInterval);
+                        this.scanInterval = null;
+                    }
+                    this.cameraActive = false;
+                    
+                    const video = document.getElementById('video');
+                    if (video) {
+                        video.srcObject = null;
+                    }
+                },
+
+                handleFileUpload(event) {
+                    const file = event.target.files[0];
+                    if (!file) return;
+
+                    this.uploadedFileName = file.name;
+                    const reader = new FileReader();
+
+                    reader.onload = (e) => {
+                        this.uploadedImage = e.target.result;
+                        this.scanImageFile(e.target.result);
+                    };
+
+                    reader.readAsDataURL(file);
+                },
+
+                scanImageFile(imageSrc) {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.getElementById('canvas');
+                        const canvasContext = canvas.getContext('2d');
+                        
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        canvasContext.drawImage(img, 0, 0);
+                        
+                        const imageData = canvasContext.getImageData(0, 0, canvas.width, canvas.height);
+                        const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                            inversionAttempts: 'dontInvert',
+                        });
+
+                        if (code) {
+                            this.scannedText = code.data;
+                            this.logScannedCode(code.data);
+                            this.showSuccessMessage('QR code decoded successfully!');
+                        } else {
+                            this.scannedText = '';
+                            this.showSuccessMessage('No QR code found in image', 'is-warning');
+                        }
+                    };
+                    img.src = imageSrc;
+                },
+
+                isURL(text) {
+                    try {
+                        const url = new URL(text);
+                        return url.protocol === 'http:' || url.protocol === 'https:';
+                    } catch {
+                        return false;
+                    }
+                },
+
+                copyToClipboard(text) {
+                    if (!text) return;
+                    
+                    navigator.clipboard.writeText(text).then(() => {
+                        this.showSuccessMessage('Copied to clipboard!');
+                    }).catch(err => {
+                        const textarea = document.createElement('textarea');
+                        textarea.value = text;
+                        textarea.style.position = 'fixed';
+                        textarea.style.opacity = '0';
+                        document.body.appendChild(textarea);
+                        textarea.select();
+                        document.execCommand('copy');
+                        document.body.removeChild(textarea);
+                        this.showSuccessMessage('Copied to clipboard!');
+                    });
+                },
+
+                showSuccessMessage(message, type = 'is-success') {
+                    this.successMessage = message;
+                    this.showSuccess = true;
+                    setTimeout(() => {
+                        this.showSuccess = false;
+                    }, 3000);
+                },
+
+                addToHistory(text, qrImage) {
+                    const timestamp = new Date().toLocaleString();
+                    this.history.unshift({ text, qrImage, timestamp });
+                    
+                    if (this.history.length > 10) {
+                        this.history = this.history.slice(0, 10);
+                    }
+                    
+                    this.saveHistory();
+                },
+
+                loadHistory() {
+                    try {
+                        const stored = localStorage.getItem('qrHistory');
+                        if (stored) {
+                            this.history = JSON.parse(stored);
+                        }
+                    } catch (e) {
+                        console.error('Failed to load history:', e);
+                        this.history = [];
+                    }
+                },
+
+                saveHistory() {
+                    try {
+                        localStorage.setItem('qrHistory', JSON.stringify(this.history));
+                    } catch (e) {
+                        console.error('Failed to save history:', e);
+                    }
+                },
+
+                clearHistory() {
+                    if (confirm('Are you sure you want to clear the QR code history?')) {
+                        this.history = [];
+                        localStorage.removeItem('qrHistory');
+                        this.showSuccessMessage('History cleared!');
+                    }
+                },
+
+                restoreQRCode(text) {
+                    this.activeTab = 'generate';
+                    this.inputText = text;
+                    setTimeout(() => {
+                        this.generateQRCode();
+                    }, 100);
+                },
+
+                logScannedCode(text) {
+                    // Generate a QR code image for the scanned code
+                    const tempDiv = document.createElement('div');
+                    try {
+                        new QRCode(tempDiv, {
+                            text: text,
+                            width: 128,
+                            height: 128,
+                            colorDark: '#000000',
+                            colorLight: '#ffffff',
+                            correctLevel: QRCode.CorrectLevel.H
+                        });
+
+                        setTimeout(() => {
+                            const canvas = tempDiv.querySelector('canvas');
+                            if (canvas) {
+                                const qrImage = canvas.toDataURL();
+                                this.addToHistory(text, qrImage);
+                            }
+                        }, 100);
+                    } catch (error) {
+                        console.error('Error logging scanned code:', error);
+                    }
+                }
+            }
+        }
+    </script>
+</body>
+</html>

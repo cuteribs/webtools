@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UUID Generator</title>
+    <!-- Bulma CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Alpine.js -->
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>
+        .uuid-output {
+            background-color: #f5f5f5;
+            padding: 0.75rem;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 1rem;
+            word-break: break-all;
+            position: relative;
+        }
+        .uuid-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 0.75rem;
+            padding: 0.75rem;
+            background-color: #f9f9f9;
+            border-radius: 4px;
+            border: 1px solid #e0e0e0;
+            transition: all 0.2s ease;
+        }
+        .uuid-item:hover {
+            background-color: #f0f0f0;
+            border-color: #d0d0d0;
+        }
+        .uuid-text {
+            flex-grow: 1;
+            font-family: 'Courier New', monospace;
+            font-size: 0.95rem;
+            color: #363636;
+        }
+        .uuid-empty {
+            color: #7a7a7a;
+        }
+        .copy-button {
+            flex-shrink: 0;
+        }
+        .success-message {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            animation: slideIn 0.3s ease;
+        }
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        .history-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 0.5rem 0.75rem;
+            border-bottom: 1px solid #e0e0e0;
+            transition: background-color 0.2s ease;
+        }
+        .history-item:hover {
+            background-color: #f9f9f9;
+        }
+        .history-item:last-child {
+            border-bottom: none;
+        }
+        .history-timestamp {
+            font-size: 0.8rem;
+            color: #7a7a7a;
+            white-space: nowrap;
+            min-width: 140px;
+        }
+        .history-uuid {
+            flex-grow: 1;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            color: #363636;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+    <div x-data="uuidApp()" class="container mt-5">
+        <div class="columns is-centered">
+            <div class="column is-10">
+                <!-- Header -->
+                <div class="has-text-centered mb-5">
+                    <h1 class="title is-2">
+                        <i class="fas fa-fingerprint mr-2"></i>
+                        UUID Generator
+                    </h1>
+                    <p class="subtitle is-5">Generate unique identifiers (UUID v4)</p>
+                </div>
+
+                <!-- Main Card -->
+                <div class="card">
+                    <div class="card-content">
+                        <!-- Count Selection -->
+                        <div class="field">
+                            <label class="label">Number of UUIDs to Generate</label>
+                            <div class="control">
+                                <div class="select is-fullwidth">
+                                    <select x-model.number="count">
+                                        <option value="1">1 UUID</option>
+                                        <option value="2">2 UUIDs</option>
+                                        <option value="3">3 UUIDs</option>
+                                        <option value="4">4 UUIDs</option>
+                                        <option value="5">5 UUIDs</option>
+                                        <option value="6">6 UUIDs</option>
+                                        <option value="7">7 UUIDs</option>
+                                        <option value="8">8 UUIDs</option>
+                                        <option value="9">9 UUIDs</option>
+                                        <option value="10">10 UUIDs</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="field is-grouped is-grouped-centered mt-4">
+                            <div class="control">
+                                <button 
+                                    @click="generateUUIDs()" 
+                                    class="button is-primary is-medium">
+                                    <span class="icon">
+                                        <i class="fas fa-sync-alt"></i>
+                                    </span>
+                                    <span>Generate UUIDs</span>
+                                </button>
+                            </div>
+                            <div class="control">
+                                <button 
+                                    @click="clearAll()" 
+                                    class="button is-light is-medium">
+                                    <span class="icon">
+                                        <i class="fas fa-eraser"></i>
+                                    </span>
+                                    <span>Clear</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Empty UUID Section -->
+                        <div class="mt-5">
+                            <div class="field">
+                                <label class="label">
+                                    Empty UUID
+                                    <span class="tag is-small is-light ml-2">All Zeros</span>
+                                </label>
+                                <div class="uuid-item">
+                                    <div class="uuid-text uuid-empty">
+                                        00000000-0000-0000-0000-000000000000
+                                    </div>
+                                    <button 
+                                        @click="copyToClipboard('00000000-0000-0000-0000-000000000000')" 
+                                        class="button is-small is-outlined copy-button">
+                                        <span class="icon is-small">
+                                            <i class="fas fa-copy"></i>
+                                        </span>
+                                        <span>Copy</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Generated UUIDs Section -->
+                        <div x-show="uuids.length > 0" class="mt-5">
+                            <div class="field">
+                                <div class="level">
+                                    <div class="level-left">
+                                        <div class="level-item">
+                                            <label class="label mb-0">
+                                                Generated UUIDs
+                                                <span class="tag is-small is-primary ml-2" x-text="uuids.length"></span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="level-right">
+                                        <div class="level-item">
+                                            <button 
+                                                @click="copyAllUUIDs()" 
+                                                class="button is-small is-outlined is-primary">
+                                                <span class="icon is-small">
+                                                    <i class="fas fa-copy"></i>
+                                                </span>
+                                                <span>Copy All</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="mt-3">
+                                    <template x-for="(uuid, index) in uuids" :key="index">
+                                        <div class="uuid-item">
+                                            <div class="uuid-text" x-text="uuid"></div>
+                                            <button 
+                                                @click="copyToClipboard(uuid)" 
+                                                class="button is-small is-outlined copy-button">
+                                                <span class="icon is-small">
+                                                    <i class="fas fa-copy"></i>
+                                                </span>
+                                                <span>Copy</span>
+                                            </button>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Info Box -->
+                        <div class="notification is-info is-light mt-5">
+                            <p class="mb-2"><strong>About UUIDs (v4):</strong></p>
+                            <ul style="margin-left: 1.5rem;">
+                                <li>UUIDs are 128-bit unique identifiers</li>
+                                <li>Version 4 UUIDs are randomly generated</li>
+                                <li>Format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx</li>
+                                <li>Collision probability is extremely low (~1 in 2<sup>122</sup>)</li>
+                                <li>Commonly used in databases, APIs, and distributed systems</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- History Section -->
+                <div x-show="history.length > 0" class="card mt-5">
+                    <header class="card-header">
+                        <p class="card-header-title">
+                            <span class="icon">
+                                <i class="fas fa-history"></i>
+                            </span>
+                            <span>Recently Generated UUIDs</span>
+                            <span class="tag is-small is-light ml-2" x-text="history.length"></span>
+                        </p>
+                        <button class="card-header-icon" @click="clearHistory()" title="Clear History">
+                            <span class="icon">
+                                <i class="fas fa-trash"></i>
+                            </span>
+                        </button>
+                    </header>
+                    <div class="card-content" style="padding: 0; max-height: 400px; overflow-y: auto;">
+                        <template x-for="(item, index) in history" :key="index">
+                            <div class="history-item">
+                                <div class="history-timestamp" x-text="item.timestamp"></div>
+                                <div class="history-uuid" x-text="item.uuid"></div>
+                                <button 
+                                    @click="copyToClipboard(item.uuid)" 
+                                    class="button is-small is-outlined copy-button">
+                                    <span class="icon is-small">
+                                        <i class="fas fa-copy"></i>
+                                    </span>
+                                </button>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <!-- Back to Home -->
+                <div class="has-text-centered mt-5">
+                    <a href="index.html" class="button is-text">
+                        <span class="icon">
+                            <i class="fas fa-arrow-left"></i>
+                        </span>
+                        <span>Back to WebTools</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Success Message -->
+        <div x-show="showSuccess" 
+             x-transition
+             class="notification is-success success-message">
+            <button class="delete" @click="showSuccess = false"></button>
+            <span x-text="successMessage"></span>
+        </div>
+    </div>
+
+    <script>
+        function uuidApp() {
+            return {
+                count: 1,
+                uuids: [],
+                history: [],
+                showSuccess: false,
+                successMessage: '',
+
+                init() {
+                    // Load history from localStorage
+                    this.loadHistory();
+                },
+
+                generateUUIDs() {
+                    this.uuids = [];
+                    for (let i = 0; i < this.count; i++) {
+                        const uuid = this.generateUUID();
+                        this.uuids.push(uuid);
+                        this.addToHistory(uuid);
+                    }
+                },
+
+                generateUUID() {
+                    // Generate UUID v4 (random)
+                    // Format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
+                    // where x is any hexadecimal digit and y is one of 8, 9, A, or B
+                    
+                    if (crypto && crypto.randomUUID) {
+                        // Use the native crypto.randomUUID() if available
+                        return crypto.randomUUID();
+                    } else {
+                        // Fallback implementation
+                        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                            const r = Math.random() * 16 | 0;
+                            const v = c === 'x' ? r : (r & 0x3 | 0x8);
+                            return v.toString(16);
+                        });
+                    }
+                },
+
+                copyToClipboard(text) {
+                    if (!text) return;
+                    
+                    navigator.clipboard.writeText(text).then(() => {
+                        this.showSuccessMessage('UUID copied to clipboard!');
+                    }).catch(err => {
+                        // Fallback for older browsers
+                        const textarea = document.createElement('textarea');
+                        textarea.value = text;
+                        textarea.style.position = 'fixed';
+                        textarea.style.opacity = '0';
+                        document.body.appendChild(textarea);
+                        textarea.select();
+                        document.execCommand('copy');
+                        document.body.removeChild(textarea);
+                        this.showSuccessMessage('UUID copied to clipboard!');
+                    });
+                },
+
+                copyAllUUIDs() {
+                    if (this.uuids.length === 0) return;
+                    
+                    const allUUIDs = this.uuids.join('\n');
+                    navigator.clipboard.writeText(allUUIDs).then(() => {
+                        this.showSuccessMessage(`${this.uuids.length} UUIDs copied to clipboard!`);
+                    }).catch(err => {
+                        // Fallback for older browsers
+                        const textarea = document.createElement('textarea');
+                        textarea.value = allUUIDs;
+                        textarea.style.position = 'fixed';
+                        textarea.style.opacity = '0';
+                        document.body.appendChild(textarea);
+                        textarea.select();
+                        document.execCommand('copy');
+                        document.body.removeChild(textarea);
+                        this.showSuccessMessage(`${this.uuids.length} UUIDs copied to clipboard!`);
+                    });
+                },
+
+                showSuccessMessage(message) {
+                    this.successMessage = message;
+                    this.showSuccess = true;
+                    setTimeout(() => {
+                        this.showSuccess = false;
+                    }, 2000);
+                },
+
+                addToHistory(uuid) {
+                    // Add UUID with timestamp to history
+                    const timestamp = new Date().toLocaleString();
+                    this.history.unshift({ uuid, timestamp });
+                    
+                    // Keep only the last 20 UUIDs
+                    if (this.history.length > 20) {
+                        this.history = this.history.slice(0, 20);
+                    }
+                    
+                    // Save to localStorage
+                    this.saveHistory();
+                },
+
+                loadHistory() {
+                    try {
+                        const stored = localStorage.getItem('uuidHistory');
+                        if (stored) {
+                            this.history = JSON.parse(stored);
+                        }
+                    } catch (e) {
+                        console.error('Failed to load history:', e);
+                        this.history = [];
+                    }
+                },
+
+                saveHistory() {
+                    try {
+                        localStorage.setItem('uuidHistory', JSON.stringify(this.history));
+                    } catch (e) {
+                        console.error('Failed to save history:', e);
+                    }
+                },
+
+                clearHistory() {
+                    if (confirm('Are you sure you want to clear the UUID history?')) {
+                        this.history = [];
+                        localStorage.removeItem('uuidHistory');
+                        this.showSuccessMessage('History cleared!');
+                    }
+                },
+
+                clearAll() {
+                    this.uuids = [];
+                    this.count = 1;
+                }
+            }
+        }
+    </script>
+</body>
+</html>

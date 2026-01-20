@@ -214,7 +214,7 @@
             return {
                 tools: [
                     {
-                        id: 'jwt-tool',
+                        id: 'jwt',
                         name: 'JWT Decoder & Verifier',
                         description: 'Decode JWT tokens and verify signatures with auto-discovery',
                         category: 'Security',
@@ -232,11 +232,11 @@
                         ]
                     },
                     {
-                        id: 'string-encoder',
+                        id: 'string',
                         name: 'String Encoder/Decoder',
                         description: 'Encode and decode strings using various formats and methods',
                         category: 'Encoding',
-                        url: 'string-encoder.html',
+                        url: 'string.html',
                         icon: 'fas fa-code',
                         iconClass: 'has-text-info',
                         buttonClass: 'is-info',
@@ -252,11 +252,31 @@
                         ]
                     },
                     {
-                        id: 'mac-vendor-lookup',
+                        id: 'uuid',
+                        name: 'UUID Generator',
+                        description: 'Generate unique identifiers (UUID v4) with easy copy functionality',
+                        category: 'Development',
+                        url: 'uuid.html',
+                        icon: 'fas fa-fingerprint',
+                        iconClass: 'has-text-primary',
+                        buttonClass: 'is-primary',
+                        tags: ['UUID', 'GUID', 'Identifier'],
+                        features: [
+                            'Generate 1-10 UUIDs at once',
+                            'Empty UUID (all zeros) available',
+                            'UUID v4 (random) format',
+                            'One-click copy for each UUID',
+                            'Copy all UUIDs at once',
+                            'Clean, easy-to-read format',
+                            'No server-side processing'
+                        ]
+                    },
+                    {
+                        id: 'mac',
                         name: 'MAC Vendor Lookup',
                         description: 'Look up network device manufacturers by MAC address or OUI',
                         category: 'Network',
-                        url: 'mac-vendor-lookup.html',
+                        url: 'mac.html',
                         icon: 'fas fa-network-wired',
                         iconClass: 'has-text-success',
                         buttonClass: 'is-success',
@@ -269,6 +289,26 @@
                             'Offline operation after initial download',
                             'Automatic database refresh capability',
                             'Copy vendor information to clipboard'
+                        ]
+                    },
+                    {
+                        id: 'qr',
+                        name: 'QR Code Generator & Scanner',
+                        description: 'Generate QR codes from text or scan QR codes from images and camera',
+                        category: 'Utilities',
+                        url: 'qr.html',
+                        icon: 'fas fa-qrcode',
+                        iconClass: 'has-text-danger',
+                        buttonClass: 'is-danger',
+                        tags: ['QR Code', 'Scanner', 'Generator', 'Camera'],
+                        features: [
+                            'Generate QR codes from any text',
+                            'Adjustable QR code sizes',
+                            'Download QR codes as PNG images',
+                            'Scan QR codes using device camera',
+                            'Upload and scan images',
+                            'Real-time QR code detection',
+                            'History tracking with thumbnails'
                         ]
                     }
                 ]
