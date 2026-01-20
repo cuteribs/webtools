@@ -76,33 +76,9 @@
                     </h2>
                 </div>
 
-                <!-- Category Filter -->
-                <div class="has-text-centered mb-5">
-                    <div class="field is-grouped is-grouped-centered">
-                        <div class="control">
-                            <div class="select">
-                                <select x-model="selectedCategory" @change="filterTools()">
-                                    <option value="all">All Categories</option>
-                                    <template x-for="category in categories" :key="category">
-                                        <option :value="category" x-text="category"></option>
-                                    </template>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="control">
-                            <input 
-                                x-model="searchQuery" 
-                                @input="filterTools()"
-                                class="input" 
-                                type="text" 
-                                placeholder="Search tools...">
-                        </div>
-                    </div>
-                </div>
-
                 <!-- Tools Grid -->
                 <div class="columns is-multiline">
-                    <template x-for="tool in filteredTools" :key="tool.id">
+                    <template x-for="tool in tools" :key="tool.id">
                         <div class="column is-6-tablet is-4-desktop">
                             <div class="card tool-card">
                                 <div class="card-content has-text-centered">
@@ -139,15 +115,6 @@
                             </div>
                         </div>
                     </template>
-                </div>
-
-                <!-- No Results Message -->
-                <div x-show="filteredTools.length === 0" class="has-text-centered">
-                    <div class="notification is-warning is-light">
-                        <i class="fas fa-search fa-2x mb-3"></i>
-                        <p class="title is-4">No tools found</p>
-                        <p class="subtitle">Try adjusting your search or category filter</p>
-                    </div>
                 </div>
             </div>
         </section>
@@ -245,10 +212,6 @@
     <script>
         function portalApp() {
             return {
-                selectedCategory: 'all',
-                searchQuery: '',
-                filteredTools: [],
-                
                 tools: [
                     {
                         id: 'jwt-tool',
@@ -287,38 +250,28 @@
                             'Emoji Unicode conversion',
                             'JSON string escaping'
                         ]
+                    },
+                    {
+                        id: 'mac-vendor-lookup',
+                        name: 'MAC Vendor Lookup',
+                        description: 'Look up network device manufacturers by MAC address or OUI',
+                        category: 'Network',
+                        url: 'mac-vendor-lookup.html',
+                        icon: 'fas fa-network-wired',
+                        iconClass: 'has-text-success',
+                        buttonClass: 'is-success',
+                        tags: ['MAC Address', 'OUI', 'Network', 'Hardware'],
+                        features: [
+                            'Lookup vendors by MAC address or OUI',
+                            'Uses Wireshark manufacturer database',
+                            'Smart local caching for fast lookups',
+                            'Supports multiple MAC address formats',
+                            'Offline operation after initial download',
+                            'Automatic database refresh capability',
+                            'Copy vendor information to clipboard'
+                        ]
                     }
-                ],
-
-                get categories() {
-                    return [...new Set(this.tools.map(tool => tool.category))];
-                },
-
-                init() {
-                    this.filterTools();
-                },
-
-                filterTools() {
-                    let filtered = this.tools;
-
-                    // Filter by category
-                    if (this.selectedCategory !== 'all') {
-                        filtered = filtered.filter(tool => tool.category === this.selectedCategory);
-                    }
-
-                    // Filter by search query
-                    if (this.searchQuery.trim()) {
-                        const query = this.searchQuery.toLowerCase();
-                        filtered = filtered.filter(tool => 
-                            tool.name.toLowerCase().includes(query) ||
-                            tool.description.toLowerCase().includes(query) ||
-                            tool.tags.some(tag => tag.toLowerCase().includes(query)) ||
-                            tool.features.some(feature => feature.toLowerCase().includes(query))
-                        );
-                    }
-
-                    this.filteredTools = filtered;
-                }
+                ]
             }
         }
     </script>

@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MAC Address Vendor Lookup</title>
+    <!-- Bulma CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Alpine.js -->
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://unpkg.com/dexie@4.x.x/dist/dexie.min.js"></script>
+    <style>
+        .input-field {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.95em;
+        }
+
+        .vendor-result {
+            background-color: #f5f5f5;
+            padding: 1.5rem;
+            border-radius: 6px;
+            border-left: 4px solid #48c774;
+            min-height: 120px;
+        }
+
+        .error-result {
+            background-color: #fef7f7;
+            border-left-color: #ff3860;
+        }
+
+        .loading-result {
+            background-color: #f7f9ff;
+            border-left-color: #3273dc;
+        }
+
+        .mac-examples {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.85em;
+            color: #666;
+        }
+
+        .cache-info {
+            font-size: 0.8rem;
+            color: #999;
+        }
+
+        .vendor-details {
+            background: #ffffff;
+            border: 1px solid #e1e1e1;
+            border-radius: 4px;
+            padding: 1rem;
+            margin-top: 1rem;
+        }
+
+        .copy-button {
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .copy-button:hover {
+            background-color: #f0f0f0;
+        }
+    </style>
+</head>
+
+<body>
+    <div x-data="macLookupApp()" class="container mt-5">
+        <div class="columns is-centered">
+            <div class="column is-8">
+                <!-- Header -->
+                <div class="has-text-centered mb-5">
+                    <h1 class="title is-2">
+                        <i class="fas fa-network-wired mr-2"></i>
+                        MAC Address Vendor Lookup
+                    </h1>
+                    <p class="subtitle is-5">Look up network device manufacturers by MAC address</p>
+                </div>
+
+                <!-- Main Card -->
+                <div class="card">
+                    <div class="card-content">
+                        <!-- MAC Address Input -->
+                        <div class="field">
+                            <label class="label">MAC Address or OUI</label>
+                            <div class="control has-icons-left has-icons-right">
+                                <input class="input input-field" type="text" x-model="macInput" @input="handleInput()"
+                                    placeholder="Enter MAC address (e.g., 00:50:56:12:34:56) or OUI (e.g., 00:50:56)"
+                                    :class="{ 'is-danger': hasError }">
+                                <span class="icon is-small is-left">
+                                    <i class="fas fa-ethernet"></i>
+                                </span>
+                                <span class="icon is-small is-right" x-show="isLoading">
+                                    <i class="fas fa-spinner fa-pulse"></i>
+                                </span>
+                            </div>
+                            <p class="help mac-examples">
+                                Examples: 00:50:56:12:34:56, 00-50-56-12-34-56, 005056123456, or just 00:50:56
+                                <br>
+                                <em>Search automatically triggers when you enter 6 or more digits</em>
+                            </p>
+                            <p class="help is-danger" x-show="hasError" x-text="errorMessage"></p>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="field is-grouped">
+                            <div class="control">
+                                <button class="button is-light" @click="clearAll()" :disabled="isLoading">
+                                    <span class="icon">
+                                        <i class="fas fa-eraser"></i>
+                                    </span>
+                                    <span>Clear</span>
+                                </button>
+                            </div>
+                            <div class="control">
+                                <button class="button is-info is-light" @click="refreshCache()" :class="{ 'is-loading': isRefreshing }"
+                                    :disabled="isLoading || isRefreshing">
+                                    <span class="icon">
+                                        <i class="fas fa-sync-alt"></i>
+                                    </span>
+                                    <span>Refresh Database</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Results Section -->
+                        <div x-show="showResult" class="mt-5">
+                            <div class="vendor-result" :class="{ 'error-result': hasError, 'loading-result': isLoading }">
+                                <!-- Loading State -->
+                                <div x-show="isLoading" class="has-text-centered">
+                                    <i class="fas fa-spinner fa-pulse fa-2x has-text-primary mb-3"></i>
+                                    <p class="title is-5">Looking up vendor information...</p>
+                                    <p class="subtitle is-6">Please wait while we search the database</p>
+                                </div>
+
+                                <!-- Error State -->
+                                <div x-show="hasError && !isLoading" class="has-text-centered">
+                                    <i class="fas fa-exclamation-triangle fa-2x has-text-danger mb-3"></i>
+                                    <p class="title is-5 has-text-danger">Lookup Failed</p>
+                                    <p class="subtitle is-6" x-text="errorMessage"></p>
+                                </div>
+
+                                <!-- Success State -->
+                                <div x-show="vendorInfo && !hasError && !isLoading">
+                                    <div class="level">
+                                        <div class="level-left">
+                                            <div class="level-item">
+                                                <div>
+                                                    <p class="title is-4">
+                                                        <i class="fas fa-building mr-2 has-text-success"></i>
+                                                        <span x-text="vendorInfo?.vendor || 'Unknown Vendor'"></span>
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="level-right">
+                                            <div class="level-item">
+                                                <button class="button is-small copy-button" @click="copyToClipboard(vendorInfo?.vendor || '')"
+                                                    title="Copy vendor name">
+                                                    <span class="icon is-small">
+                                                        <i class="fas fa-copy"></i>
+                                                    </span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="vendor-details">
+                                        <div class="columns">
+                                            <div class="column">
+                                                <div class="field">
+                                                    <label class="label is-small">OUI Prefix</label>
+                                                    <p class="has-text-weight-semibold" x-text="vendorInfo?.oui || ''"></p>
+                                                </div>
+                                            </div>
+                                            <div class="column">
+                                                <div class="field">
+                                                    <label class="label is-small">Queried MAC</label>
+                                                    <p class="has-text-weight-semibold" x-text="queriedMac || ''"></p>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div x-show="vendorInfo?.description" class="field">
+                                            <label class="label is-small">Additional Information</label>
+                                            <p x-text="vendorInfo?.description || ''"></p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Not Found State -->
+                                <div x-show="!vendorInfo && !hasError && !isLoading && showResult && searched">
+                                    <div class="has-text-centered">
+                                        <i class="fas fa-question-circle fa-2x has-text-warning mb-3"></i>
+                                        <p class="title is-5 has-text-warning">Vendor Not Found</p>
+                                        <p class="subtitle is-6">
+                                            No vendor information found for the provided MAC address or OUI prefix.
+                                            <br>
+                                            This might be a private or unregistered range.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Database Information -->
+                        <div class="mt-4">
+                            <div class="level">
+                                <div class="level-left">
+                                    <div class="level-item">
+                                        <p class="cache-info">
+                                            <i class="fas fa-database mr-1"></i>
+                                            <span x-show="cacheInfo" x-text="cacheInfo"></span>
+                                            <span x-show="!cacheInfo">Loading database...</span>
+                                        </p>
+                                    </div>
+                                </div>
+                                <div class="level-right">
+                                    <div class="level-item">
+                                        <p class="cache-info">
+                                            <span x-text="databaseSize"></span>
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Information Card -->
+                <div class="card mt-5">
+                    <div class="card-content">
+                        <h3 class="title is-5">
+                            <i class="fas fa-info-circle mr-2"></i>
+                            How it works
+                        </h3>
+                        <div class="content">
+                            <ul>
+                                <li><strong>OUI Database:</strong> Uses Wireshark's manufacturer database for accurate vendor identification</li>
+                                <li><strong>Smart Caching:</strong> Database is cached locally for faster subsequent lookups</li>
+                                <li><strong>Flexible Input:</strong> Accepts full MAC addresses or just the first 3 octets (OUI)</li>
+                                <li><strong>Format Support:</strong> Handles various MAC address formats (colon, dash, or no separators)</li>
+                                <li><strong>Privacy:</strong> All lookups are performed locally - no data is sent to external servers after initial
+                                    database download</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Back to Home -->
+                <div class="has-text-centered mt-5">
+                    <a href="index.html" class="button is-light">
+                        <span class="icon">
+                            <i class="fas fa-home"></i>
+                        </span>
+                        <span>Back to WebTools</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function macLookupApp() {
+            // Constants to reduce magic strings
+            const DB_CONFIG = {
+                NAME: 'MacVendorDB',
+                VERSION: 1,
+                STORES: {
+                    VENDORS: 'vendors',
+                    METADATA: 'metadata'
+                },
+                KEYS: {
+                    CREATED_AT: 'created_at'
+                }
+            };
+
+            const API_CONFIG = {
+                LOCAL_FILE: 'manuf.json',
+                REMOTE_FILE: 'https://www.wireshark.org/json/manuf.json',
+                DEBOUNCE_DELAY: 500,
+                MIN_HEX_LENGTH: 6,
+                MAX_HEX_LENGTH: 12
+            };
+
+            const ERROR_MESSAGES = {
+                TOO_SHORT: 'MAC address or OUI too short (minimum 6 hex characters required)',
+                TOO_LONG: 'MAC address too long (maximum 12 hex characters)',
+                NO_INPUT: 'Please enter a MAC address or OUI',
+                DB_UNAVAILABLE: 'Database is not available or corrupted. Please try refreshing the database.',
+                FETCH_FAILED: 'Failed to load manufacturer database',
+                REFRESH_FAILED: 'Failed to refresh database'
+            };
+
+            return {
+                db: null,
+                macInput: '',
+                vendorInfo: null,
+                queriedMac: '',
+                isLoading: false,
+                isRefreshing: false,
+                hasError: false,
+                errorMessage: '',
+                showResult: false,
+                searched: false,
+                cacheInfo: '',
+                databaseSize: '',
+                searchTimeout: null,
+
+                async init() {
+                    await this.ensureDb();
+                },
+
+                handleInput() {
+                    // Clear previous timeout
+                    if (this.searchTimeout) {
+                        clearTimeout(this.searchTimeout);
+                    }
+
+                    // Clear current results
+                    this.clearResult();
+
+                    // Get clean input (only hex characters)
+                    const cleanInput = this.macInput.replace(/[^0-9A-Fa-f]/g, '');
+
+                    // If we have 6 or more hex characters, trigger search with debounce
+                    if (cleanInput.length >= API_CONFIG.MIN_HEX_LENGTH) {
+                        this.searchTimeout = setTimeout(() => {
+                            this.lookupVendor();
+                        }, API_CONFIG.DEBOUNCE_DELAY);
+                    }
+                },
+
+                async getLocalDbVersion() {
+                    try {
+                        return await this.db.metadata.limit(1).first()?.created_at;
+                    } catch (e) {
+                        console.error('Error loading local database:', e);
+                        return null;
+                    }
+                },
+
+                async getRemoteDbVersion() {
+                    try {
+                        // Try to get just the created_at field with a partial request
+                        // Since the API doesn't support range requests, we'll use a lightweight approach
+                        const response = await fetch(API_CONFIG.REMOTE_FILE, {
+                            method: 'GET',
+                            headers: {
+                                'Range': 'bytes=0-1023'  // Try to get first 1KB which should contain created_at
+                            }
+                        });
+
+                        let createdAt = null;
+
+                        if (response.status === 206) {
+                            // Partial content received
+                            const jsonText = await response.text();
+
+                            // Try to parse partial JSON or extract created_at
+                            const createdAtMatch = jsonText.match(/"created_at":\s*"([^"]+)"/);
+
+                            if (createdAtMatch) {
+                                createdAt = createdAtMatch[1].slice(0, 10);
+                            }
+                        }
+
+                        return createdAt;
+                    } catch (error) {
+                        console.error('Error checking remote version:', error);
+                        return null;
+                    }
+                },
+
+                async fillDbWithJson(jsonUrl) {
+                    try {
+                        this.message = 'Loading local manufacturer database...';
+
+                        // Fetch local JSON file
+                        const response = await fetch(jsonUrl);
+
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+
+                        const jsonResponse = await response.json();
+
+                        if (!jsonResponse || !jsonResponse.created_at || !jsonResponse.data) {
+                            throw new Error('Invalid data format in local JSON');
+                        }
+
+                        this.message = 'Storing local database...';
+                        const dbVersion = jsonResponse.created_at.slice(0, 10);
+                        console.log(`Loaded local manufacturer database (${dbVersion})`);
+
+                        // Save to IndexedDB
+                        await this.saveDataToDb(jsonResponse.data, dbVersion);
+
+                        console.log('Local database loaded successfully');
+                    } catch (error) {
+                        console.error('Error loading local manufacturer database:', error);
+                        this.message = ERROR_MESSAGES.GENERIC_ERROR;
+                        throw new Error(`${ERROR_MESSAGES.FETCH_FAILED}: ${error.message}`);
+                    }
+                },
+
+                async saveDataToDb(data, createdAt) {
+                    try {
+                        const db = this.db;
+
+                        db.metadata.clear();
+                        await db.metadata.put({
+                            created_at: createdAt
+                        });
+
+                        db.vendors.clear();
+                        const vendors = Object.entries(data)
+                            .map(([oui, vendor]) => ({
+                                oui: oui.toUpperCase(),
+                                vendor: vendor
+                            }));
+                        db.vendors.bulkPut(vendors);
+
+                    } catch (error) {
+                        console.error('Error saving data to IndexedDB:', error);
+                        throw error;
+                    }
+                },
+
+                async ensureDb() {
+                    try {
+                        this.isLoading = true;
+                        this.message = 'Checking for database updates...';
+
+                        const db = new Dexie(DB_CONFIG.NAME);
+                        db.version(1).stores({
+                            vendors: `&oui, vendor`,
+                            metadata: 'created_at'
+                        });
+                        this.db = db;
+
+                        const dbVersion = await db.metadata.limit(1).first()?.created_at;
+                        const remoteDbVersion = await this.getRemoteDbVersion();
+
+                        if (remoteDbVersion) {
+                            if (!dbVersion || remoteDbVersion > dbVersion) {
+                                await this.fillDbWithJson(API_CONFIG.REMOTE_FILE);
+                            } else {
+                                this.message = `Database is up to date! (${dbVersion})`;
+                                this.isLoading = false;
+                            }
+                        } else if (!dbVersion) {
+                            await this.fillDbWithJson(API_CONFIG.LOCAL_FILE);
+                        }
+                    } catch (error) {
+                        console.error('Error loading manufacturer database:', error);
+                        throw new Error(`${ERROR_MESSAGES.DB_UNAVAILABLE}: ${error.message}`);
+                    }
+                },
+
+                normalizeMacAddress(mac) {
+                    // Remove all non-hex characters
+                    const cleanMac = mac.replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
+
+                    // Validate length (should be at least 6 characters for OUI, max 12 for full MAC)
+                    if (cleanMac.length < API_CONFIG.MIN_HEX_LENGTH) {
+                        throw new Error(ERROR_MESSAGES.TOO_SHORT);
+                    }
+
+                    if (cleanMac.length > API_CONFIG.MAX_HEX_LENGTH) {
+                        throw new Error(ERROR_MESSAGES.TOO_LONG);
+                    }
+
+                    // Take first 6 characters (OUI) without colons to match database keys
+                    return cleanMac.substring(0, API_CONFIG.MIN_HEX_LENGTH);
+                },
+
+                async lookupVendor() {
+                    if (!this.macInput.trim()) {
+                        this.showError(ERROR_MESSAGES.NO_INPUT);
+                        return;
+                    }
+
+                    this.isLoading = true;
+                    this.hasError = false;
+                    this.showResult = true;
+                    this.searched = false;
+                    this.vendorInfo = null;
+
+                    try {
+                        // Normalize the MAC address
+                        const oui = this.normalizeMacAddress(this.macInput.trim());
+
+                        const vendor = await this.db.vendors.get(oui);
+                        const vendorName = vendor?.vendor || 'Unknown Vendor';
+
+                        if (vendor) {
+                            this.vendorInfo = {
+                                oui: oui.replace(/(.{2})/g, '$1:').slice(0, -1), // Format for display as XX:XX:XX
+                                vendor: vendorName
+                            };
+                        } else {
+                            this.vendorInfo = null;
+                        }
+
+                        this.searched = true;
+                    } catch (error) {
+                        this.showError(error.message);
+                    } finally {
+                        this.isLoading = false;
+                    }
+                },
+
+                async refreshDb() {
+                    this.isRefreshing = true;
+                    try {
+                        await this.fillDbWithJson(API_CONFIG.REMOTE_FILE);
+                        this.message = 'Database refreshed successfully!';
+                    } catch (error) {
+                        this.showError(`${ERROR_MESSAGES.REFRESH_FAILED}: ${error.message}`);
+                    } finally {
+                        this.isRefreshing = false;
+                    }
+                },
+
+                showError(message) {
+                    this.hasError = true;
+                    this.errorMessage = message;
+                    this.showResult = true;
+                    this.vendorInfo = null;
+                },
+
+                clearResult() {
+                    this.showResult = false;
+                    this.hasError = false;
+                    this.errorMessage = '';
+                    this.vendorInfo = null;
+                    this.searched = false;
+                },
+
+                clearAll() {
+                    this.macInput = '';
+                    this.clearResult();
+                },
+
+                async copyToClipboard(text) {
+                    if (navigator.clipboard && window.isSecureContext) {
+                        try {
+                            await navigator.clipboard.writeText(text);
+                            // Visual feedback could be added here
+                        } catch (err) {
+                            console.error('Failed to copy text: ', err);
+                        }
+                    } else {
+                        // Fallback for older browsers
+                        const textArea = document.createElement("textarea");
+                        textArea.value = text;
+                        document.body.appendChild(textArea);
+                        textArea.focus();
+                        textArea.select();
+                        try {
+                            document.execCommand('copy');
+                        } catch (err) {
+                            console.error('Fallback: Failed to copy text: ', err);
+                        }
+                        document.body.removeChild(textArea);
+                    }
+                }
+            }
+        }
+    </script>
+</body>
+
+</html>
