@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -25,9 +26,11 @@
             align-items: center;
             min-height: 280px;
         }
+
         .qr-output canvas {
             image-rendering: pixelated;
         }
+
         .scan-area {
             background-color: #f5f5f5;
             padding: 1.5rem;
@@ -39,15 +42,18 @@
             align-items: center;
             min-height: 300px;
         }
+
         #video {
             width: 100%;
             max-width: 500px;
             border-radius: 4px;
             border: 2px solid #3273dc;
         }
+
         #canvas {
             display: none;
         }
+
         .decoded-text {
             background-color: #f5f5f5;
             padding: 1rem;
@@ -57,6 +63,7 @@
             word-break: break-all;
             border: 1px solid #e0e0e0;
         }
+
         .success-message {
             position: fixed;
             top: 20px;
@@ -64,16 +71,19 @@
             z-index: 1000;
             animation: slideIn 0.3s ease;
         }
+
         @keyframes slideIn {
             from {
                 transform: translateX(100%);
                 opacity: 0;
             }
+
             to {
                 transform: translateX(0);
                 opacity: 1;
             }
         }
+
         .history-item {
             display: flex;
             align-items: center;
@@ -82,18 +92,22 @@
             border-bottom: 1px solid #e0e0e0;
             transition: background-color 0.2s ease;
         }
+
         .history-item:hover {
             background-color: #f9f9f9;
         }
+
         .history-item:last-child {
             border-bottom: none;
         }
+
         .history-timestamp {
             font-size: 0.8rem;
             color: #7a7a7a;
             white-space: nowrap;
             min-width: 140px;
         }
+
         .history-text {
             flex-grow: 1;
             font-family: 'Courier New', monospace;
@@ -101,13 +115,16 @@
             color: #363636;
             word-break: break-all;
         }
+
         .qr-preview {
             max-width: 100px;
             flex-shrink: 0;
         }
+
         .tabs {
             margin-bottom: 1.5rem;
         }
+
         .file-preview {
             max-width: 100%;
             max-height: 400px;
@@ -116,6 +133,7 @@
         }
     </style>
 </head>
+
 <body>
     <div x-data="qrApp()" class="container mt-5">
         <div class="columns is-centered">
@@ -159,12 +177,8 @@
                         <div class="field">
                             <label class="label">Text to Encode</label>
                             <div class="control">
-                                <textarea 
-                                    x-model="inputText" 
-                                    class="textarea" 
-                                    placeholder="Enter text, URL, or any data to encode into a QR code..."
-                                    rows="4"
-                                    @input="generateQRCode()"></textarea>
+                                <textarea x-model="inputText" class="textarea" placeholder="Enter text, URL, or any data to encode into a QR code..."
+                                    rows="4" @input="generateQRCode()"></textarea>
                             </div>
                             <p class="help" x-text="`${inputText.length} characters`"></p>
                         </div>
@@ -199,10 +213,7 @@
                         <!-- Action Buttons -->
                         <div class="field is-grouped is-grouped-centered mt-4">
                             <div class="control">
-                                <button 
-                                    @click="downloadQRCode()" 
-                                    :disabled="!inputText"
-                                    class="button is-primary">
+                                <button @click="downloadQRCode()" :disabled="!inputText" class="button is-primary">
                                     <span class="icon">
                                         <i class="fas fa-download"></i>
                                     </span>
@@ -210,9 +221,7 @@
                                 </button>
                             </div>
                             <div class="control">
-                                <button 
-                                    @click="clearGenerate()" 
-                                    class="button is-light">
+                                <button @click="clearGenerate()" class="button is-light">
                                     <span class="icon">
                                         <i class="fas fa-eraser"></i>
                                     </span>
@@ -265,9 +274,7 @@
                         <div x-show="scanMode === 'camera'">
                             <div class="field">
                                 <div class="control">
-                                    <button 
-                                        @click="cameraActive ? stopCamera() : startCamera()" 
-                                        class="button is-fullwidth"
+                                    <button @click="cameraActive ? stopCamera() : startCamera()" class="button is-fullwidth"
                                         :class="cameraActive ? 'is-danger' : 'is-primary'">
                                         <span class="icon">
                                             <i :class="cameraActive ? 'fas fa-stop' : 'fas fa-play'"></i>
@@ -290,7 +297,8 @@
                             </div>
 
                             <div x-show="cameraActive" class="notification is-warning is-light mt-3">
-                                <p><i class="fas fa-info-circle"></i> Position the QR code in front of your camera. The scanner will automatically detect and decode it.</p>
+                                <p><i class="fas fa-info-circle"></i> Position the QR code in front of your camera. The scanner will automatically
+                                    detect and decode it.</p>
                             </div>
                         </div>
 
@@ -299,11 +307,7 @@
                             <div class="field">
                                 <div class="file is-boxed is-primary has-name is-fullwidth">
                                     <label class="file-label">
-                                        <input 
-                                            class="file-input" 
-                                            type="file" 
-                                            accept="image/*"
-                                            @change="handleFileUpload($event)">
+                                        <input class="file-input" type="file" accept="image/*" @change="handleFileUpload($event)">
                                         <span class="file-cta">
                                             <span class="file-icon">
                                                 <i class="fas fa-upload"></i>
@@ -332,9 +336,7 @@
                             <div class="decoded-text" x-text="scannedText"></div>
                             <div class="field is-grouped is-grouped-centered mt-3">
                                 <div class="control">
-                                    <button 
-                                        @click="copyToClipboard(scannedText)" 
-                                        class="button is-primary is-outlined">
+                                    <button @click="copyToClipboard(scannedText)" class="button is-primary is-outlined">
                                         <span class="icon">
                                             <i class="fas fa-copy"></i>
                                         </span>
@@ -342,10 +344,7 @@
                                     </button>
                                 </div>
                                 <div x-show="isURL(scannedText)" class="control">
-                                    <a 
-                                        :href="scannedText" 
-                                        target="_blank"
-                                        class="button is-info is-outlined">
+                                    <a :href="scannedText" target="_blank" class="button is-info is-outlined">
                                         <span class="icon">
                                             <i class="fas fa-external-link-alt"></i>
                                         </span>
@@ -392,16 +391,12 @@
                                     <img :src="item.qrImage" :alt="'QR Code ' + index" style="width: 80px; height: 80px;">
                                 </div>
                                 <div class="history-text" x-text="item.text"></div>
-                                <button 
-                                    @click="copyToClipboard(item.text)" 
-                                    class="button is-small is-outlined">
+                                <button @click="copyToClipboard(item.text)" class="button is-small is-outlined">
                                     <span class="icon is-small">
                                         <i class="fas fa-copy"></i>
                                     </span>
                                 </button>
-                                <button 
-                                    @click="restoreQRCode(item.text)" 
-                                    class="button is-small is-outlined is-primary">
+                                <button @click="restoreQRCode(item.text)" class="button is-small is-outlined is-primary">
                                     <span class="icon is-small">
                                         <i class="fas fa-redo"></i>
                                     </span>
@@ -424,9 +419,7 @@
         </div>
 
         <!-- Success Message -->
-        <div x-show="showSuccess" 
-             x-transition
-             class="notification is-success success-message">
+        <div x-show="showSuccess" x-transition class="notification is-success success-message">
             <button class="delete" @click="showSuccess = false"></button>
             <span x-text="successMessage"></span>
         </div>
@@ -456,7 +449,7 @@
 
                 generateQRCode() {
                     const container = document.getElementById('qrcode-container');
-                    
+
                     // Clear previous QR code
                     const existingQR = container.querySelector('.qrcode-wrapper');
                     if (existingQR) {
@@ -531,8 +524,8 @@
                     const canvasContext = canvas.getContext('2d');
 
                     try {
-                        this.stream = await navigator.mediaDevices.getUserMedia({ 
-                            video: { facingMode: 'environment' } 
+                        this.stream = await navigator.mediaDevices.getUserMedia({
+                            video: { facingMode: 'environment' }
                         });
                         video.srcObject = this.stream;
                         this.cameraActive = true;
@@ -540,7 +533,7 @@
                         // Wait for video to be ready before starting scanning
                         video.onloadedmetadata = () => {
                             video.play();
-                            
+
                             // Start scanning after a short delay to ensure video is ready
                             setTimeout(() => {
                                 this.scanInterval = setInterval(() => {
@@ -548,7 +541,7 @@
                                         canvas.width = video.videoWidth;
                                         canvas.height = video.videoHeight;
                                         canvasContext.drawImage(video, 0, 0, canvas.width, canvas.height);
-                                        
+
                                         const imageData = canvasContext.getImageData(0, 0, canvas.width, canvas.height);
                                         const code = jsQR(imageData.data, imageData.width, imageData.height, {
                                             inversionAttempts: 'dontInvert',
@@ -581,7 +574,7 @@
                         this.scanInterval = null;
                     }
                     this.cameraActive = false;
-                    
+
                     const video = document.getElementById('video');
                     if (video) {
                         video.srcObject = null;
@@ -608,11 +601,11 @@
                     img.onload = () => {
                         const canvas = document.getElementById('canvas');
                         const canvasContext = canvas.getContext('2d');
-                        
+
                         canvas.width = img.width;
                         canvas.height = img.height;
                         canvasContext.drawImage(img, 0, 0);
-                        
+
                         const imageData = canvasContext.getImageData(0, 0, canvas.width, canvas.height);
                         const code = jsQR(imageData.data, imageData.width, imageData.height, {
                             inversionAttempts: 'dontInvert',
@@ -641,7 +634,7 @@
 
                 copyToClipboard(text) {
                     if (!text) return;
-                    
+
                     navigator.clipboard.writeText(text).then(() => {
                         this.showSuccessMessage('Copied to clipboard!');
                     }).catch(err => {
@@ -668,11 +661,11 @@
                 addToHistory(text, qrImage) {
                     const timestamp = new Date().toLocaleString();
                     this.history.unshift({ text, qrImage, timestamp });
-                    
+
                     if (this.history.length > 10) {
                         this.history = this.history.slice(0, 10);
                     }
-                    
+
                     this.saveHistory();
                 },
 
@@ -740,4 +733,5 @@
         }
     </script>
 </body>
+
 </html>
